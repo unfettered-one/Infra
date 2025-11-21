@@ -105,3 +105,16 @@ variable "region" {
   description = "The AWS region to deploy resources"
   type        = string
 }
+
+# --- API Gateway (HTTP API) ---
+
+variable "create_http_api" {
+  description = "Whether to create an API Gateway HTTP API from an OpenAPI spec"
+  type        = bool
+  default     = true
+}
+
+variable "api_spec_path" {
+  description = "Path to the OpenAPI/Swagger spec file used to create the HTTP API"
+  type        = string
+}

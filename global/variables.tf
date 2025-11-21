@@ -14,5 +14,10 @@ variable "region" {
 variable "git_hub_user_name" {
   description = "GitHub username for repository access"
   type        = string
-  
+
+}
+
+variable "repo_name" {
+  description = "GitHub repository name for repository access"
+  type        = string
 }

@@ -1,0 +1,95 @@
+
+# Locals for Lambda Naming & Logic
+locals {
+  lambda_name = "${var.service_name}-${var.stage}-${data.aws_caller_identity.current.account_id}"
+
+  # If using ECR → construct image URI automatically
+  final_image_uri = (var.use_ecr && var.use_container ?
+    "${aws_ecr_repository.lambda_repo[0].repository_url}:latest" :
+  var.lambda_image_uri)
+}
+
+
+resource "aws_cloudwatch_log_group" "lambda_log" {
+  name              = "/aws/lambda/${local.lambda_name}"
+  retention_in_days = 1
+
+  tags = {
+    ManagedBy = "UnfetteredOne"
+    Stage     = var.stage
+  }
+}
+
+# Optional ECR Repository for Image Mode
+resource "aws_ecr_repository" "lambda_repo" {
+  count = var.use_container && var.use_ecr ? 1 : 0
+
+  name = "${var.service_name}-${var.stage}-${data.aws_caller_identity.current.account_id}"
+
+  image_scanning_configuration {
+    scan_on_push = true
+  }
+
+  tags = {
+    ManagedBy = "UnfetteredOne"
+    Stage     = var.stage
+  }
+}
+
+
+# Lambda ZIP Deployment (use_zip = true)
+
+resource "aws_lambda_function" "zip_lambda" {
+  count = var.use_zip ? 1 : 0
+
+  function_name = local.lambda_name
+  filename      = var.lambda_zip_path
+  handler       = var.lambda_handler
+  runtime       = var.lambda_runtime
+  role          = aws_iam_role.lambda_exec_role.arn
+
+  timeout     = var.timeout
+  memory_size = var.memory_size
+
+  environment {
+    variables = var.environment_variables
+  }
+
+  tags = {
+    ManagedBy = "UnfetteredOne"
+    Stage     = var.stage
+  }
+}
+
+
+
+# Lambda Container Deployment (use_container = true)
+resource "aws_lambda_function" "container_lambda" {
+  count         = var.use_container ? 1 : 0
+  function_name = local.lambda_name
+
+  package_type = "Image"
+  image_uri    = local.final_image_uri
+
+  role = aws_iam_role.lambda_exec_role.arn
+
+  timeout     = var.timeout
+  memory_size = var.memory_size
+
+  environment {
+    variables = var.environment_variables
+  }
+
+  tags = {
+    ManagedBy = "UnfetteredOne"
+    Stage     = var.stage
+  }
+}
+
+
+
+
+
+# Outputs
+
+

@@ -48,7 +48,7 @@ resource "aws_s3_bucket_server_side_encryption_configuration" "tfstate_encryptio
 
 # 5. DynamoDB Lock Table for Terraform
 resource "aws_dynamodb_table" "tfstate_locks" {
-  name         = "terraform-locks-${var.stage}"
+  name         = "terraform-locks-${var.stage}-${data.aws_caller_identity.current.account_id}"
   billing_mode = "PAY_PER_REQUEST"
 
   hash_key = "LockID"

@@ -1,0 +1,42 @@
+name: "Terraform Plan"
+
+on:
+  workflow_call:
+    inputs:
+      aws_region:
+        type: string
+        required: true
+
+    secrets:
+      access_key:
+        required: true
+      secret_key:
+        required: true
+      session_token:
+        required: true
+
+jobs:
+  terraform_init_plan:
+    runs-on: ubuntu-latest
+
+    environment:
+      env:
+        AWS_ACCESS_KEY_ID: ${{ secrets.access_key }}
+        AWS_SECRET_ACCESS_KEY: ${{ secrets.secret_key }}
+        AWS_SESSION_TOKEN: ${{ secrets.session_token }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: hashicorp/setup-terraform@v3
+
+      - name: Terraform Init
+        run: terraform init
+
+      - name: Terraform Plan
+        run: terraform plan -out=tfplan
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: tfplan-artifact
+          path: tfplan

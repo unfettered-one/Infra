@@ -18,7 +18,7 @@ jobs:
 
   # ---- Stage 1: AWS Auth ----
   creds:
-    uses: unfettered-one/Infra/.github/workflows/creds/aws_creds.yml
+    uses: unfettered-one/Infra/.github/workflows/aws_creds.yml@feat/pipeline
     with:
       role_arn: ${{ inputs.role_arn }}
       aws_region: ${{ inputs.aws_region }}
@@ -26,13 +26,13 @@ jobs:
   # ---- Stage 2a: Terraform Plan ----
   plan:
     needs: creds
-    uses: unfettered-one/Infra/.github/workflows/deploy/plan.yml
+    uses: unfettered-one/Infra/.github/workflows/plan.yml@feat/pipeline
     with:
       aws_region: ${{ inputs.aws_region }}
 
   # ---- Stage 2b: Terraform Apply ----
   apply:
     needs: plan
-    uses: unfettered-one/Infra/.github/workflows/deploy/apply.yml
+    uses: unfettered-one/Infra/.github/workflows/apply.yml@feat/pipeline
     with:
       aws_region: ${{ inputs.aws_region }} 

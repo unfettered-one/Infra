@@ -23,7 +23,6 @@ locals {
   ) ? "" : "ERROR: lambda_zip_path must be provided when use_zip=true."
 
 
-  lambda_name = "${var.service_name}-${var.stage}-${data.aws_caller_identity.current.account_id}"
 }
 
 # Validation Resources to enforce checks

@@ -34,12 +34,16 @@ data "aws_iam_policy_document" "github_actions_assume_role" {
     }
 
     actions = ["sts:AssumeRoleWithWebIdentity"]
-
+    condition {
+      test     = "StringEquals"
+      variable = "token.actions.githubusercontent.com:aud"
+      values   = ["sts.amazonaws.com"]
+    }
     condition {
       test     = "StringLike"
       variable = "token.actions.githubusercontent.com:sub"
       values = [
-        "repo:${var.git_hub_user_name}/${var.repo_name}:ref:refs/heads/*"
+        "repo:${var.git_hub_user_name}/*"
       ]
     }
   }

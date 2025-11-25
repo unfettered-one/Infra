@@ -14,29 +14,97 @@ env:
   TF_IN_AUTOMATION: "true"
   TF_INPUT: "false"
 
-# permissions:
-#   id-token: write
-#   contents: read
-
 jobs:
 
-  # ---- Stage 1: AWS Auth ----
+
+  # Stage 1 — Authenticate with AWS OIDC
   creds:
-    uses: unfettered-one/Infra/.github/workflows/aws_creds.yml@feat/pipeline
-    with:
-      role_arn: ${{ inputs.role_arn }}
-      aws_region: ${{ inputs.aws_region }}
+    name: "AWS Credentials via OIDC"
+    runs-on: ubuntu-latest
 
-  # ---- Stage 2a: Terraform Plan ----
+    permissions:
+      id-token: write
+      contents: read
+
+    outputs:
+      access_key: ${{ steps.creds.outputs.aws-access-key-id }}
+      secret_key: ${{ steps.creds.outputs.aws-secret-access-key }}
+      session_token: ${{ steps.creds.outputs.aws-session-token }}
+
+    steps:
+
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS Credentials
+        id: creds
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ inputs.role_arn }}
+          aws-region: ${{ inputs.aws_region }}
+          role-session-name: "oidc-session"
+
+      - name: Verify caller identity
+        run: aws sts get-caller-identity
+
+
+  # Stage 2 — Terraform Plan
   plan:
+    name: "Terraform Plan"
     needs: creds
-    uses: unfettered-one/Infra/.github/workflows/plan.yml@feat/pipeline
-    with:
-      aws_region: ${{ inputs.aws_region }}
+    runs-on: ubuntu-latest
 
-  # ---- Stage 2b: Terraform Apply ----
+    env:
+      AWS_ACCESS_KEY_ID: ${{ needs.creds.outputs.access_key }}
+      AWS_SECRET_ACCESS_KEY: ${{ needs.creds.outputs.secret_key }}
+      AWS_SESSION_TOKEN: ${{ needs.creds.outputs.session_token }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+
+      - name: Terraform Init
+        run: terraform init
+
+      - name: Terraform Plan
+        run: terraform plan -out=tfplan -no-color
+
+      - name: Upload Plan File
+        uses: actions/upload-artifact@v4
+        with:
+          name: terraform-plan
+          path: tfplan
+          retention-days: 1
+
+
+  # ----------------------------------------------------
+  # Stage 3 — Terraform Apply
+  # ----------------------------------------------------
   apply:
-    needs: plan
-    uses: unfettered-one/Infra/.github/workflows/apply.yml@feat/pipeline
-    with:
-      aws_region: ${{ inputs.aws_region }} 
+    name: "Terraform Apply"
+    needs: [creds, plan]
+    runs-on: ubuntu-latest
+
+    env:
+      AWS_ACCESS_KEY_ID: ${{ needs.creds.outputs.access_key }}
+      AWS_SECRET_ACCESS_KEY: ${{ needs.creds.outputs.secret_key }}
+      AWS_SESSION_TOKEN: ${{ needs.creds.outputs.session_token }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+
+      - name: Terraform Init
+        run: terraform init
+
+      - name: Download Plan File
+        uses: actions/download-artifact@v4
+        with:
+          name: terraform-plan
+
+      - name: Terraform Apply
+        run: terraform apply -auto-approve tfplan

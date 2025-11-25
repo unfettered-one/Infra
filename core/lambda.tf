@@ -1,7 +1,7 @@
 
 # Locals for Lambda Naming & Logic
 locals {
-  lambda_name = "${var.service_name}-${var.stage}-${data.aws_caller_identity.current.account_id}"
+  lambda_name = "${var.service_name}-${var.stage}-${data.aws_caller_identity.current.account_id}-lambda"
 
   # If using ECR → construct image URI automatically
   final_image_uri = (var.use_ecr && var.use_container ?

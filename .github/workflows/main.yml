@@ -35,4 +35,4 @@ jobs:
     needs: plan
     uses: unfettered-one/Infra/.github/workflows/deploy/apply.yml
     with:
-      aws_region: ${{ inputs.aws_region }}
+      aws_region: ${{ inputs.aws_region }} 

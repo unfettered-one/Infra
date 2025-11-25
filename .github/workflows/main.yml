@@ -9,6 +9,10 @@ on:
       aws_region:
         required: true
         type: string
+      working_directory:
+        required: false
+        type: string
+        default: "."
 
 env:
   TF_IN_AUTOMATION: "true"

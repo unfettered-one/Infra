@@ -20,7 +20,6 @@ env:
 
 jobs:
 
-
   # Stage 1 — Authenticate with AWS OIDC
   creds:
     name: "AWS Credentials via OIDC"
@@ -58,6 +57,10 @@ jobs:
     needs: creds
     runs-on: ubuntu-latest
 
+    defaults:
+      run:
+        working-directory: ${{ inputs.working_directory }}
+
     env:
       AWS_ACCESS_KEY_ID: ${{ needs.creds.outputs.access_key }}
       AWS_SECRET_ACCESS_KEY: ${{ needs.creds.outputs.secret_key }}
@@ -79,17 +82,19 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: terraform-plan
-          path: tfplan
+          path: ${{ inputs.working_directory }}/tfplan
           retention-days: 1
 
 
-  # ----------------------------------------------------
   # Stage 3 — Terraform Apply
-  # ----------------------------------------------------
   apply:
     name: "Terraform Apply"
     needs: [creds, plan]
     runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: ${{ inputs.working_directory }}
 
     env:
       AWS_ACCESS_KEY_ID: ${{ needs.creds.outputs.access_key }}
@@ -109,6 +114,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: terraform-plan
+          path: ${{ inputs.working_directory }}
 
       - name: Terraform Apply
         run: terraform apply -auto-approve tfplan

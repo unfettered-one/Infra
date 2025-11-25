@@ -19,11 +19,11 @@ jobs:
   terraform_init_plan:
     runs-on: ubuntu-latest
 
-    environment:
-      env:
-        AWS_ACCESS_KEY_ID: ${{ secrets.access_key }}
-        AWS_SECRET_ACCESS_KEY: ${{ secrets.secret_key }}
-        AWS_SESSION_TOKEN: ${{ secrets.session_token }}
+    
+    env:
+      AWS_ACCESS_KEY_ID: ${{ secrets.access_key }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.secret_key }}
+      AWS_SESSION_TOKEN: ${{ secrets.session_token }}
 
     steps:
       - uses: actions/checkout@v4

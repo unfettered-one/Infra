@@ -43,6 +43,25 @@ on:
         type: string
         description: "Branch name of the Infra repo to checkout Dockerfile from"
         default: "main"
+      service_name:
+        required: true
+        type: string
+        description: "Name of the service for backend state key"
+      stage:
+        required: true
+        type: string
+        description: "Environment stage (dev, stage, prod)"
+      tfstate_bucket:
+        required: true
+        type: string
+        description: "S3 bucket name for Terraform state"
+        default: 'tfstate-dev-815817733987'
+
+      lock_table:
+        required: true
+        type: string
+        description: "DynamoDB table name for Terraform state locking"
+        default: 'terraform-locks-dev-815817733987'
 
 env:
   TF_IN_AUTOMATION: "true"
@@ -163,11 +182,29 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Checkout Infra repository for backend config
+        uses: actions/checkout@v4
+        with:
+          repository: unfettered-one/Infra
+          path: _infra
+          ref: ${{ inputs.branch_name }}
+
+      - name: Setup Backend Configuration
+        run: |
+          # Create backend config from template
+          sed "s/<<TFSTATE_BUCKET>>/${{ inputs.tfstate_bucket }}/g; \
+               s/<<SERVICE_NAME>>/${{ inputs.service_name }}/g; \
+               s/<<REGION>>/${{ inputs.aws_region }}/g; \
+               s/<<LOCK_TABLE>>/${{ inputs.lock_table }}/g" \
+               _infra/global/backend-config-template.hcl > backend.hcl
+          echo "Backend configuration:"
+          cat backend.hcl
+
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
 
       - name: Terraform Init
-        run: terraform init
+        run: terraform init -backend-config=backend.hcl
 
       - name: Terraform Plan
         run: |
@@ -204,11 +241,29 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Checkout Infra repository for backend config
+        uses: actions/checkout@v4
+        with:
+          repository: unfettered-one/Infra
+          path: _infra
+          ref: ${{ inputs.branch_name }}
+
+      - name: Setup Backend Configuration
+        run: |
+          # Create backend config from template
+          sed "s/<<TFSTATE_BUCKET>>/${{ inputs.tfstate_bucket }}/g; \
+               s/<<SERVICE_NAME>>/${{ inputs.service_name }}/g; \
+               s/<<REGION>>/${{ inputs.aws_region }}/g; \
+               s/<<LOCK_TABLE>>/${{ inputs.lock_table }}/g" \
+               _infra/global/backend-config-template.hcl > backend.hcl
+          echo "Backend configuration:"
+          cat backend.hcl
+
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
 
       - name: Terraform Init
-        run: terraform init
+        run: terraform init -backend-config=backend.hcl
 
       - name: Download Plan File
         uses: actions/download-artifact@v4

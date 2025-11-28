@@ -16,8 +16,3 @@ variable "git_hub_user_name" {
   type        = string
 
 }
-
-variable "repo_name" {
-  description = "GitHub repository name for repository access"
-  type        = string
-}

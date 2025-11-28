@@ -16,8 +16,18 @@ on:
       lambda_code_path:
         required: false
         type: string
-        description: "Path to the Lambda code directory containing Dockerfile"
+        description: "Path to the Lambda code directory (build context)"
         default: ""
+      dockerfile_path:
+        required: false
+        type: string
+        description: "Path to Dockerfile relative to repo root"
+        default: "./dockerfiles/lambda-python.Dockerfile"
+      lambda_handler:
+        required: false
+        type: string
+        description: "Lambda handler entrypoint (e.g., app.lambda_handler)"
+        default: "app.lambda_handler"
       build_image:
         required: false
         type: boolean
@@ -95,7 +105,12 @@ jobs:
         env:
           IMAGE_TAG: ${{ github.sha }}
         run: |
-          docker build -t $REGISTRY/$IMAGE_NAME:$IMAGE_TAG -t $REGISTRY/$IMAGE_NAME:latest ${{ inputs.lambda_code_path }}
+          docker build \
+            -f ${{ inputs.dockerfile_path }} \
+            --build-arg HANDLER=${{ inputs.lambda_handler }} \
+            -t $REGISTRY/$IMAGE_NAME:$IMAGE_TAG \
+            -t $REGISTRY/$IMAGE_NAME:latest \
+            ${{ inputs.lambda_code_path }}
           docker push $REGISTRY/$IMAGE_NAME:$IMAGE_TAG
           docker push $REGISTRY/$IMAGE_NAME:latest
           echo "image_uri=$REGISTRY/$IMAGE_NAME:$IMAGE_TAG" >> $GITHUB_OUTPUT

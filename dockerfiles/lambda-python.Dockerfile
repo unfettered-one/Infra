@@ -1,0 +1,32 @@
+# Generic Lambda Python Dockerfile
+# Supports both setup.py and requirements.txt
+# Usage: docker build --build-arg HANDLER=app.lambda_handler -f lambda-python.Dockerfile /path/to/lambda/code
+
+FROM public.ecr.aws/lambda/python:3.11
+
+# Accept handler as build argument (can be overridden at build time)
+ARG HANDLER=app.lambda_handler
+
+# Copy all service code to Lambda task root
+COPY . ${LAMBDA_TASK_ROOT}/
+
+# Set working directory
+WORKDIR ${LAMBDA_TASK_ROOT}
+
+# Install dependencies - prioritize setup.py, fallback to requirements.txt
+RUN if [ -f setup.py ]; then \
+    echo "Installing dependencies from setup.py..."; \
+    pip install --no-cache-dir . --target "${LAMBDA_TASK_ROOT}"; \
+    elif [ -f requirements.txt ]; then \
+    echo "Installing dependencies from requirements.txt..."; \
+    pip install --no-cache-dir -r requirements.txt --target "${LAMBDA_TASK_ROOT}"; \
+    else \
+    echo "No dependency file found (setup.py or requirements.txt). Skipping..."; \
+    fi
+
+# Set the CMD to your handler (can be overridden at runtime)
+CMD [ "${HANDLER}" ]
+
+# Alternative: If you want handler to be more flexible, use this instead:
+# ENTRYPOINT [ "python", "-m", "awslambdaric" ]
+# CMD [ "app.lambda_handler" ]

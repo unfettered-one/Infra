@@ -181,21 +181,16 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Checkout Infra repository for backend config
-        uses: actions/checkout@v4
-        with:
-          repository: unfettered-one/Infra
-          path: _infra
-          ref: ${{ inputs.branch_name }}
-
       - name: Setup Backend Configuration
         run: |
-          # Create backend config from template
-          sed "s/<<TFSTATE_BUCKET>>/${{ inputs.tfstate_bucket }}/g; \
-               s/<<SERVICE_NAME>>/${{ inputs.service_name }}/g; \
-               s/<<REGION>>/${{ inputs.aws_region }}/g; \
-               s/<<LOCK_TABLE>>/${{ inputs.lock_table }}/g" \
-               _infra/global/backend-config-template.hcl > backend.hcl
+          # Create backend config directly
+          cat > backend.hcl << EOF
+          bucket         = "${{ inputs.tfstate_bucket }}"
+          key            = "${{ inputs.service_name }}/terraform.tfstate"
+          region         = "${{ inputs.aws_region }}"
+          dynamodb_table = "${{ inputs.lock_table }}"
+          encrypt        = true
+          EOF
           echo "Backend configuration:"
           cat backend.hcl
 
@@ -249,21 +244,16 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Checkout Infra repository for backend config
-        uses: actions/checkout@v4
-        with:
-          repository: unfettered-one/Infra
-          path: _infra
-          ref: ${{ inputs.branch_name }}
-
       - name: Setup Backend Configuration
         run: |
-          # Create backend config from template
-          sed "s/<<TFSTATE_BUCKET>>/${{ inputs.tfstate_bucket }}/g; \
-               s/<<SERVICE_NAME>>/${{ inputs.service_name }}/g; \
-               s/<<REGION>>/${{ inputs.aws_region }}/g; \
-               s/<<LOCK_TABLE>>/${{ inputs.lock_table }}/g" \
-               _infra/global/backend-config-template.hcl > backend.hcl
+          # Create backend config directly
+          cat > backend.hcl << EOF
+          bucket         = "${{ inputs.tfstate_bucket }}"
+          key            = "${{ inputs.service_name }}/terraform.tfstate"
+          region         = "${{ inputs.aws_region }}"
+          dynamodb_table = "${{ inputs.lock_table }}"
+          encrypt        = true
+          EOF
           echo "Backend configuration:"
           cat backend.hcl
 

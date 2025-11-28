@@ -5,7 +5,7 @@ variable "stage" {
 }
 
 
-variable "region" {
+variable "aws_region" {
   default     = "ap-south-1" #(mumbai)
   description = "The AWS region to deploy resources"
   type        = string

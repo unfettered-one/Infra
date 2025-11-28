@@ -20,7 +20,7 @@ output "stage" {
 }
 
 # Output: AWS region
-output "region" {
+output "aws_region" {
   description = "AWS region used to deploy resources"
-  value       = var.region
+  value       = var.aws_region
 }

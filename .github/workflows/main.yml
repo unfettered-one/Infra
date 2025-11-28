@@ -22,7 +22,7 @@ on:
         required: false
         type: string
         description: "Path to Dockerfile relative to repo root"
-        default: "./dockerfiles/lambda-python.Dockerfile"
+        default: "dockerfiles/lambda-python.Dockerfile"
       use_local_dockerfile:
         required: false
         type: boolean

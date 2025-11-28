@@ -103,10 +103,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: unfettered-one/Infra
-          path: _infra_dockerfiles
-          sparse-checkout: |
-            dockerfiles
-          sparse-checkout-cone-mode: false
+          path: _infra
           ref: main
 
       - name: Login to GitHub Container Registry
@@ -129,15 +126,15 @@ jobs:
             DOCKERFILE_PATH="${{ inputs.dockerfile_path }}"
             echo "Using Dockerfile from calling repository: $DOCKERFILE_PATH"
           else
-            DOCKERFILE_PATH="_infra_dockerfiles/dockerfiles/${{ inputs.dockerfile_path }}"
+            DOCKERFILE_PATH="_infra/dockerfiles/${{ inputs.dockerfile_path }}"
             echo "Using Dockerfile from Infra repository: $DOCKERFILE_PATH"
           fi
           
           # Debug: Show what files are actually there
-          echo "Files in _infra_dockerfiles:"
-          ls -la _infra_dockerfiles/ || echo "_infra_dockerfiles not found"
-          echo "Files in _infra_dockerfiles/dockerfiles:"
-          ls -la _infra_dockerfiles/dockerfiles/ || echo "_infra_dockerfiles/dockerfiles not found"
+          echo "Files in _infra:"
+          ls -la _infra/ || echo "_infra not found"
+          echo "Files in _infra/dockerfiles:"
+          ls -la _infra/dockerfiles/ || echo "_infra/dockerfiles not found"
           
           docker build \
             -f "$DOCKERFILE_PATH" \

@@ -1,5 +1,14 @@
 
 # Validation Locals
+terraform {
+  required_providers {
+    aws = {
+      source  = "hashicorp/aws"
+      version = "~> 5.0"
+    }
+  }
+}
+
 locals {
   # Exactly one mode must be enabled
   lambda_mode_error = (

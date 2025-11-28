@@ -57,9 +57,9 @@ env:
 
 jobs:
 
-  # -----------------------------
-  # Stage 1 — AWS OIDC Credentials
-  # -----------------------------
+  #######################################################
+  # STAGE 1 — ASSUME ROLE & EXPORT AWS CREDS
+  #######################################################
   creds:
     name: "AWS Credentials via OIDC"
     runs-on: ubuntu-latest
@@ -67,11 +67,6 @@ jobs:
     permissions:
       id-token: write
       contents: read
-
-    outputs:
-      access_key: ${{ steps.creds.outputs.aws-access-key-id }}
-      secret_key: ${{ steps.creds.outputs.aws-secret-access-key }}
-      session_token: ${{ steps.creds.outputs.aws-session-token }}
 
     steps:
       - uses: actions/checkout@v4
@@ -84,12 +79,19 @@ jobs:
           aws-region: ${{ inputs.aws_region }}
           role-session-name: "oidc-session"
           output-credentials: true
+
       - name: Verify Caller Identity
         run: aws sts get-caller-identity
 
-  # -----------------------------
-  # Stage 2 — Docker Build (Optional)
-  # -----------------------------
+      - name: Export AWS Creds for all Jobs
+        run: |
+          echo "AWS_ACCESS_KEY_ID=${{ steps.creds.outputs.aws-access-key-id }}" >> $GITHUB_ENV
+          echo "AWS_SECRET_ACCESS_KEY=${{ steps.creds.outputs.aws-secret-access-key }}" >> $GITHUB_ENV
+          echo "AWS_SESSION_TOKEN=${{ steps.creds.outputs.aws-session-token }}" >> $GITHUB_ENV
+
+  #######################################################
+  # STAGE 2 — BUILD DOCKER IMAGE (OPTIONAL)
+  #######################################################
   build-image:
     name: "Build Lambda Docker Image"
     needs: creds
@@ -108,8 +110,7 @@ jobs:
       IMAGE_NAME: ${{ github.repository }}/lambda-function
 
     steps:
-      - name: Checkout service repo
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
       - name: Checkout Infra repo (for Dockerfile)
         if: ${{ !inputs.use_local_dockerfile }}
@@ -133,7 +134,6 @@ jobs:
         run: |
           IMAGE_NAME_LOWER=$(echo "$IMAGE_NAME" | tr '[:upper:]' '[:lower:]')
 
-          # Decide Dockerfile source
           if [ "${{ inputs.use_local_dockerfile }}" == "true" ]; then
             DOCKERFILE_PATH="${{ inputs.dockerfile_path }}"
           else
@@ -151,24 +151,23 @@ jobs:
           docker push $REGISTRY/$IMAGE_NAME_LOWER:latest
           echo "image_uri=$REGISTRY/$IMAGE_NAME_LOWER:$IMAGE_TAG" >> $GITHUB_OUTPUT
 
-  # -----------------------------
-  # Stage 3 — Terraform Plan
-  # -----------------------------
+  #######################################################
+  # STAGE 3 — TERRAFORM PLAN
+  #######################################################
   plan:
     name: "Terraform Plan"
     needs: [creds, build-image]
-    if: always() && needs.creds.result == 'success' && (needs.build-image.result == 'success' || needs.build-image.result == 'skipped')
     runs-on: ubuntu-latest
 
     env:
-      AWS_ACCESS_KEY_ID: ${{ needs.creds.outputs.access_key }}
-      AWS_SECRET_ACCESS_KEY: ${{ needs.creds.outputs.secret_key }}
-      AWS_SESSION_TOKEN: ${{ needs.creds.outputs.session_token }}
+      AWS_ACCESS_KEY_ID: ${{ env.AWS_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ env.AWS_SECRET_ACCESS_KEY }}
+      AWS_SESSION_TOKEN: ${{ env.AWS_SESSION_TOKEN }}
 
     steps:
       - uses: actions/checkout@v4
 
-      - name: Setup backend configuration
+      - name: Create backend.hcl
         working-directory: ${{ inputs.working_directory }}
         run: |
           cat > backend.hcl << EOF
@@ -180,30 +179,20 @@ jobs:
           EOF
 
       - uses: hashicorp/setup-terraform@v3
-      - name: Debug AWS environment
+
+      - name: Debug AWS
         working-directory: ${{ inputs.working_directory }}
         run: |
           echo "AWS_ACCESS_KEY_ID length: ${#AWS_ACCESS_KEY_ID}"
           echo "AWS_SECRET_ACCESS_KEY length: ${#AWS_SECRET_ACCESS_KEY}"
           echo "AWS_SESSION_TOKEN length: ${#AWS_SESSION_TOKEN}"
+
       - name: Terraform Init
         working-directory: ${{ inputs.working_directory }}
-        env:
-          AWS_ACCESS_KEY_ID: ${{ needs.creds.outputs.access_key }}
-          AWS_SECRET_ACCESS_KEY: ${{ needs.creds.outputs.secret_key }}
-          AWS_SESSION_TOKEN: ${{ needs.creds.outputs.session_token }}
-        run: |
-          echo "AWS_ACCESS_KEY_ID length: ${#AWS_ACCESS_KEY_ID}"
-          echo "AWS_SECRET_ACCESS_KEY length: ${#AWS_SECRET_ACCESS_KEY}"
-          echo "AWS_SESSION_TOKEN length: ${#AWS_SESSION_TOKEN}"
-          terraform init -backend-config=backend.hcl
+        run: terraform init -backend-config=backend.hcl
 
       - name: Terraform Plan
         working-directory: ${{ inputs.working_directory }}
-        env:
-          AWS_ACCESS_KEY_ID: ${{ needs.creds.outputs.access_key }}
-          AWS_SECRET_ACCESS_KEY: ${{ needs.creds.outputs.secret_key }}
-          AWS_SESSION_TOKEN: ${{ needs.creds.outputs.session_token }}
         run: |
           if [ "${{ inputs.build_image }}" == "true" ]; then
             terraform plan \
@@ -211,13 +200,13 @@ jobs:
               -var="region=${{ inputs.aws_region }}" \
               -var="stage=${{ inputs.stage }}" \
               -var="service_name=${{ inputs.service_name }}" \
-              -out=tfplan -no-color
+              -out=tfplan
           else
             terraform plan \
               -var="region=${{ inputs.aws_region }}" \
               -var="stage=${{ inputs.stage }}" \
               -var="service_name=${{ inputs.service_name }}" \
-              -out=tfplan -no-color
+              -out=tfplan
           fi
 
       - uses: actions/upload-artifact@v4
@@ -225,24 +214,23 @@ jobs:
           name: terraform-plan
           path: ${{ inputs.working_directory }}/tfplan
 
-  # -----------------------------
-  # Stage 4 — Terraform Apply
-  # -----------------------------
+  #######################################################
+  # STAGE 4 — TERRAFORM APPLY
+  #######################################################
   apply:
     name: "Terraform Apply"
-    needs: [creds, build-image, plan]
-    if: always() && needs.plan.result == 'success'
+    needs: plan
     runs-on: ubuntu-latest
 
     env:
-      AWS_ACCESS_KEY_ID: ${{ needs.creds.outputs.access_key }}
-      AWS_SECRET_ACCESS_KEY: ${{ needs.creds.outputs.secret_key }}
-      AWS_SESSION_TOKEN: ${{ needs.creds.outputs.session_token }}
+      AWS_ACCESS_KEY_ID: ${{ env.AWS_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ env.AWS_SECRET_ACCESS_KEY }}
+      AWS_SESSION_TOKEN: ${{ env.AWS_SESSION_TOKEN }}
 
     steps:
       - uses: actions/checkout@v4
 
-      - name: Setup backend configuration
+      - name: Create backend.hcl
         working-directory: ${{ inputs.working_directory }}
         run: |
           cat > backend.hcl << EOF
@@ -266,18 +254,4 @@ jobs:
 
       - name: Terraform Apply
         working-directory: ${{ inputs.working_directory }}
-        run: |
-          if [ "${{ inputs.build_image }}" == "true" ]; then
-            terraform apply \
-              -var="lambda_image_uri=${{ needs['build-image'].outputs.image_uri }}" \
-              -var="region=${{ inputs.aws_region }}" \
-              -var="stage=${{ inputs.stage }}" \
-              -var="service_name=${{ inputs.service_name }}" \
-              -auto-approve tfplan
-          else
-            terraform apply \
-              -var="region=${{ inputs.aws_region }}" \
-              -var="stage=${{ inputs.stage }}" \
-              -var="service_name=${{ inputs.service_name }}" \
-              -auto-approve tfplan
-          fi
+        run: terraform apply -auto-approve tfplan

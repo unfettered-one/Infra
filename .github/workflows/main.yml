@@ -71,7 +71,7 @@ jobs:
         run: aws sts get-caller-identity
 
 
-  # Stage 2 — Build Docker Image (Optional)
+   # Stage 2 — Build Docker Image (Optional)
   build-image:
     name: "Build Lambda Docker Image"
     needs: creds
@@ -105,16 +105,18 @@ jobs:
         env:
           IMAGE_TAG: ${{ github.sha }}
         run: |
+          # Convert repository name to lowercase for Docker compatibility
+          IMAGE_NAME_LOWER=$(echo "$IMAGE_NAME" | tr '[:upper:]' '[:lower:]')
+          
           docker build \
             -f ${{ inputs.dockerfile_path }} \
             --build-arg HANDLER=${{ inputs.lambda_handler }} \
-            -t $REGISTRY/$IMAGE_NAME:$IMAGE_TAG \
-            -t $REGISTRY/$IMAGE_NAME:latest \
+            -t $REGISTRY/$IMAGE_NAME_LOWER:$IMAGE_TAG \
+            -t $REGISTRY/$IMAGE_NAME_LOWER:latest \
             ${{ inputs.lambda_code_path }}
-          docker push $REGISTRY/$IMAGE_NAME:$IMAGE_TAG
-          docker push $REGISTRY/$IMAGE_NAME:latest
-          echo "image_uri=$REGISTRY/$IMAGE_NAME:$IMAGE_TAG" >> $GITHUB_OUTPUT
-
+          docker push $REGISTRY/$IMAGE_NAME_LOWER:$IMAGE_TAG
+          docker push $REGISTRY/$IMAGE_NAME_LOWER:latest
+          echo "image_uri=$REGISTRY/$IMAGE_NAME_LOWER:$IMAGE_TAG" >> $GITHUB_OUTPUT
 
   # Stage 3 — Terraform Plan
   plan:

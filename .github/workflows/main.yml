@@ -52,13 +52,12 @@ on:
         type: string
         description: "Environment stage (dev, stage, prod)"
       tfstate_bucket:
-        required: true
+        required: false
         type: string
         description: "S3 bucket name for Terraform state"
         default: 'tfstate-dev-815817733987'
-
       lock_table:
-        required: true
+        required: false
         type: string
         description: "DynamoDB table name for Terraform state locking"
         default: 'terraform-locks-dev-815817733987'
@@ -209,9 +208,18 @@ jobs:
       - name: Terraform Plan
         run: |
           if [ "${{ inputs.build_image }}" == "true" ]; then
-            terraform plan -var="lambda_image_uri=${{ needs.build-image.outputs.image_uri }}" -out=tfplan -no-color
+            terraform plan \
+              -var="lambda_image_uri=${{ needs.build-image.outputs.image_uri }}" \
+              -var="region=${{ inputs.aws_region }}" \
+              -var="stage=${{ inputs.stage }}" \
+              -var="service_name=${{ inputs.service_name }}" \
+              -out=tfplan -no-color
           else
-            terraform plan -out=tfplan -no-color
+            terraform plan \
+              -var="region=${{ inputs.aws_region }}" \
+              -var="stage=${{ inputs.stage }}" \
+              -var="service_name=${{ inputs.service_name }}" \
+              -out=tfplan -no-color
           fi
 
       - name: Upload Plan File
@@ -274,7 +282,16 @@ jobs:
       - name: Terraform Apply
         run: |
           if [ "${{ inputs.build_image }}" == "true" ]; then
-            terraform apply -var="lambda_image_uri=${{ needs.build-image.outputs.image_uri }}" -auto-approve tfplan
+            terraform apply \
+              -var="lambda_image_uri=${{ needs.build-image.outputs.image_uri }}" \
+              -var="region=${{ inputs.aws_region }}" \
+              -var="stage=${{ inputs.stage }}" \
+              -var="service_name=${{ inputs.service_name }}" \
+              -auto-approve tfplan
           else
-            terraform apply -auto-approve tfplan
+            terraform apply \
+              -var="region=${{ inputs.aws_region }}" \
+              -var="stage=${{ inputs.stage }}" \
+              -var="service_name=${{ inputs.service_name }}" \
+              -auto-approve tfplan
           fi

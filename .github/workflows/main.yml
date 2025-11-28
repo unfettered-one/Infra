@@ -188,10 +188,22 @@ jobs:
           echo "AWS_SESSION_TOKEN length: ${#AWS_SESSION_TOKEN}"
       - name: Terraform Init
         working-directory: ${{ inputs.working_directory }}
-        run: terraform init -backend-config=backend.hcl
+        env:
+          AWS_ACCESS_KEY_ID: ${{ needs.creds.outputs.access_key }}
+          AWS_SECRET_ACCESS_KEY: ${{ needs.creds.outputs.secret_key }}
+          AWS_SESSION_TOKEN: ${{ needs.creds.outputs.session_token }}
+        run: |
+          echo "AWS_ACCESS_KEY_ID length: ${#AWS_ACCESS_KEY_ID}"
+          echo "AWS_SECRET_ACCESS_KEY length: ${#AWS_SECRET_ACCESS_KEY}"
+          echo "AWS_SESSION_TOKEN length: ${#AWS_SESSION_TOKEN}"
+          terraform init -backend-config=backend.hcl
 
       - name: Terraform Plan
         working-directory: ${{ inputs.working_directory }}
+        env:
+          AWS_ACCESS_KEY_ID: ${{ needs.creds.outputs.access_key }}
+          AWS_SECRET_ACCESS_KEY: ${{ needs.creds.outputs.secret_key }}
+          AWS_SESSION_TOKEN: ${{ needs.creds.outputs.session_token }}
         run: |
           if [ "${{ inputs.build_image }}" == "true" ]; then
             terraform plan \

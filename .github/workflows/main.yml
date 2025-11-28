@@ -180,7 +180,12 @@ jobs:
           EOF
 
       - uses: hashicorp/setup-terraform@v3
-
+      - name: Debug AWS environment
+        working-directory: ${{ inputs.working_directory }}
+        run: |
+          echo "AWS_ACCESS_KEY_ID length: ${#AWS_ACCESS_KEY_ID}"
+          echo "AWS_SECRET_ACCESS_KEY length: ${#AWS_SECRET_ACCESS_KEY}"
+          echo "AWS_SESSION_TOKEN length: ${#AWS_SESSION_TOKEN}"
       - name: Terraform Init
         working-directory: ${{ inputs.working_directory }}
         run: terraform init -backend-config=backend.hcl

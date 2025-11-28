@@ -89,6 +89,11 @@ jobs:
           echo "AWS_SECRET_ACCESS_KEY=${{ steps.creds.outputs.aws-secret-access-key }}" >> $GITHUB_ENV
           echo "AWS_SESSION_TOKEN=${{ steps.creds.outputs.aws-session-token }}" >> $GITHUB_ENV
 
+      - name: Confirm AWS creds exported
+        run: |
+          echo "AWS_ACCESS_KEY_ID length: ${#AWS_ACCESS_KEY_ID}"
+          echo "AWS_SECRET_ACCESS_KEY length: ${#AWS_SECRET_ACCESS_KEY}"
+          echo "AWS_SESSION_TOKEN length: ${#AWS_SESSION_TOKEN}"
 
   ########################################################
   # STAGE 2 — DOCKER IMAGE BUILD (OPTIONAL)

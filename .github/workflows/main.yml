@@ -57,9 +57,9 @@ env:
 
 jobs:
 
-  #######################################################
-  # STAGE 1 — ASSUME ROLE & EXPORT AWS CREDS
-  #######################################################
+  ########################################################
+  # STAGE 1 — OIDC → ASSUME ROLE → EXPORT AWS CREDS
+  ########################################################
   creds:
     name: "AWS Credentials via OIDC"
     runs-on: ubuntu-latest
@@ -83,20 +83,21 @@ jobs:
       - name: Verify Caller Identity
         run: aws sts get-caller-identity
 
-      - name: Export AWS Creds for all Jobs
+      - name: Export AWS creds globally
         run: |
           echo "AWS_ACCESS_KEY_ID=${{ steps.creds.outputs.aws-access-key-id }}" >> $GITHUB_ENV
           echo "AWS_SECRET_ACCESS_KEY=${{ steps.creds.outputs.aws-secret-access-key }}" >> $GITHUB_ENV
           echo "AWS_SESSION_TOKEN=${{ steps.creds.outputs.aws-session-token }}" >> $GITHUB_ENV
 
-  #######################################################
-  # STAGE 2 — BUILD DOCKER IMAGE (OPTIONAL)
-  #######################################################
+
+  ########################################################
+  # STAGE 2 — DOCKER IMAGE BUILD (OPTIONAL)
+  ########################################################
   build-image:
     name: "Build Lambda Docker Image"
+    runs-on: ubuntu-latest
     needs: creds
     if: ${{ inputs.build_image }}
-    runs-on: ubuntu-latest
 
     permissions:
       contents: read
@@ -112,7 +113,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Checkout Infra repo (for Dockerfile)
+      - name: Checkout Infra repo for Dockerfile
         if: ${{ !inputs.use_local_dockerfile }}
         uses: actions/checkout@v4
         with:
@@ -120,14 +121,14 @@ jobs:
           path: _infra
           ref: ${{ inputs.branch_name }}
 
-      - name: Login to GHCR
+      - name: GHCR Login
         uses: docker/login-action@v3
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build & Push Image
+      - name: Build & Push Docker Image
         id: push
         env:
           IMAGE_TAG: ${{ github.sha }}
@@ -149,20 +150,17 @@ jobs:
 
           docker push $REGISTRY/$IMAGE_NAME_LOWER:$IMAGE_TAG
           docker push $REGISTRY/$IMAGE_NAME_LOWER:latest
+
           echo "image_uri=$REGISTRY/$IMAGE_NAME_LOWER:$IMAGE_TAG" >> $GITHUB_OUTPUT
 
-  #######################################################
+
+  ########################################################
   # STAGE 3 — TERRAFORM PLAN
-  #######################################################
+  ########################################################
   plan:
     name: "Terraform Plan"
-    needs: [creds, build-image]
     runs-on: ubuntu-latest
-
-    env:
-      AWS_ACCESS_KEY_ID: ${{ env.AWS_ACCESS_KEY_ID }}
-      AWS_SECRET_ACCESS_KEY: ${{ env.AWS_SECRET_ACCESS_KEY }}
-      AWS_SESSION_TOKEN: ${{ env.AWS_SESSION_TOKEN }}
+    needs: [creds, build-image]
 
     steps:
       - uses: actions/checkout@v4
@@ -180,7 +178,7 @@ jobs:
 
       - uses: hashicorp/setup-terraform@v3
 
-      - name: Debug AWS
+      - name: Debug AWS credentials
         working-directory: ${{ inputs.working_directory }}
         run: |
           echo "AWS_ACCESS_KEY_ID length: ${#AWS_ACCESS_KEY_ID}"
@@ -214,18 +212,14 @@ jobs:
           name: terraform-plan
           path: ${{ inputs.working_directory }}/tfplan
 
-  #######################################################
+
+  ########################################################
   # STAGE 4 — TERRAFORM APPLY
-  #######################################################
+  ########################################################
   apply:
     name: "Terraform Apply"
-    needs: plan
     runs-on: ubuntu-latest
-
-    env:
-      AWS_ACCESS_KEY_ID: ${{ env.AWS_ACCESS_KEY_ID }}
-      AWS_SECRET_ACCESS_KEY: ${{ env.AWS_SECRET_ACCESS_KEY }}
-      AWS_SESSION_TOKEN: ${{ env.AWS_SESSION_TOKEN }}
+    needs: plan
 
     steps:
       - uses: actions/checkout@v4
@@ -235,7 +229,7 @@ jobs:
         run: |
           cat > backend.hcl << EOF
           bucket         = "${{ inputs.tfstate_bucket }}"
-          key            = "${{ inputs.service_name }}/terraform.tfstate"
+          key            = "${{ inputs.service_name }}/terraform.tfstate}"
           region         = "${{ inputs.aws_region }}"
           dynamodb_table = "${{ inputs.lock_table }}"
           encrypt        = true

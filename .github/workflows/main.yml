@@ -198,7 +198,11 @@ jobs:
         uses: hashicorp/setup-terraform@v3
 
       - name: Terraform Init
-        run: terraform init -backend-config=backend.hcl
+        run: |
+          export AWS_ACCESS_KEY_ID="${{ needs.creds.outputs.access_key }}"
+          export AWS_SECRET_ACCESS_KEY="${{ needs.creds.outputs.secret_key }}"
+          export AWS_SESSION_TOKEN="${{ needs.creds.outputs.session_token }}"
+          terraform init -backend-config=backend.hcl
 
       - name: Terraform Plan
         run: |
@@ -261,7 +265,11 @@ jobs:
         uses: hashicorp/setup-terraform@v3
 
       - name: Terraform Init
-        run: terraform init -backend-config=backend.hcl
+        run: |
+          export AWS_ACCESS_KEY_ID="${{ needs.creds.outputs.access_key }}"
+          export AWS_SECRET_ACCESS_KEY="${{ needs.creds.outputs.secret_key }}"
+          export AWS_SESSION_TOKEN="${{ needs.creds.outputs.session_token }}"
+          terraform init -backend-config=backend.hcl
 
       - name: Download Plan File
         uses: actions/download-artifact@v4

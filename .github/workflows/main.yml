@@ -10,9 +10,8 @@ on:
         required: true
         type: string
       working_directory:
-        required: false
+        required: true
         type: string
-        default: "."
       lambda_code_path:
         required: false
         type: string
@@ -168,10 +167,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
-        with:
-          path: ${{ inputs.working_directory }}
 
-      - name: Backend Config
+      - name: Setup backend configuration
         working-directory: ${{ inputs.working_directory }}
         run: |
           cat > backend.hcl << EOF
@@ -193,7 +190,7 @@ jobs:
         run: |
           if [ "${{ inputs.build_image }}" == "true" ]; then
             terraform plan \
-              -var="lambda_image_uri=${{ needs.build-image.outputs.image_uri }}" \
+              -var="lambda_image_uri=${{ needs['build-image'].outputs.image_uri }}" \
               -var="region=${{ inputs.aws_region }}" \
               -var="stage=${{ inputs.stage }}" \
               -var="service_name=${{ inputs.service_name }}" \
@@ -210,7 +207,6 @@ jobs:
         with:
           name: terraform-plan
           path: ${{ inputs.working_directory }}/tfplan
-          retention-days: 1
 
   # -----------------------------
   # Stage 4 — Terraform Apply
@@ -228,10 +224,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
-        with:
-          path: ${{ inputs.working_directory }}
 
-      - name: Backend Config
+      - name: Setup backend configuration
         working-directory: ${{ inputs.working_directory }}
         run: |
           cat > backend.hcl << EOF
@@ -258,7 +252,7 @@ jobs:
         run: |
           if [ "${{ inputs.build_image }}" == "true" ]; then
             terraform apply \
-              -var="lambda_image_uri=${{ needs.build-image.outputs.image_uri }}" \
+              -var="lambda_image_uri=${{ needs['build-image'].outputs.image_uri }}" \
               -var="region=${{ inputs.aws_region }}" \
               -var="stage=${{ inputs.stage }}" \
               -var="service_name=${{ inputs.service_name }}" \

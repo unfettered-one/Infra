@@ -129,9 +129,15 @@ jobs:
             DOCKERFILE_PATH="${{ inputs.dockerfile_path }}"
             echo "Using Dockerfile from calling repository: $DOCKERFILE_PATH"
           else
-            DOCKERFILE_PATH="_infra_dockerfiles/${{ inputs.dockerfile_path }}"
+            DOCKERFILE_PATH="_infra_dockerfiles/dockerfiles/${{ inputs.dockerfile_path }}"
             echo "Using Dockerfile from Infra repository: $DOCKERFILE_PATH"
           fi
+          
+          # Debug: Show what files are actually there
+          echo "Files in _infra_dockerfiles:"
+          ls -la _infra_dockerfiles/ || echo "_infra_dockerfiles not found"
+          echo "Files in _infra_dockerfiles/dockerfiles:"
+          ls -la _infra_dockerfiles/dockerfiles/ || echo "_infra_dockerfiles/dockerfiles not found"
           
           docker build \
             -f "$DOCKERFILE_PATH" \
@@ -142,7 +148,6 @@ jobs:
           docker push $REGISTRY/$IMAGE_NAME_LOWER:$IMAGE_TAG
           docker push $REGISTRY/$IMAGE_NAME_LOWER:latest
           echo "image_uri=$REGISTRY/$IMAGE_NAME_LOWER:$IMAGE_TAG" >> $GITHUB_OUTPUT
-
   # Stage 3 — Terraform Plan
   plan:
     name: "Terraform Plan"

@@ -16,51 +16,41 @@ on:
       lambda_code_path:
         required: false
         type: string
-        description: "Path to the Lambda code directory (build context)"
         default: ""
       dockerfile_path:
         required: false
         type: string
-        description: "Path to Dockerfile relative to repo root"
         default: "lambda-python.Dockerfile"
       use_local_dockerfile:
         required: false
         type: boolean
-        description: "Use Dockerfile from calling repo (true) or Infra repo (false)"
         default: false
       lambda_handler:
         required: false
         type: string
-        description: "Lambda handler entrypoint (e.g., app.lambda_handler)"
         default: "app.lambda_handler"
       build_image:
         required: false
         type: boolean
-        description: "Whether to build and push Docker image for Lambda"
         default: false
       branch_name:
         required: false
         type: string
-        description: "Branch name of the Infra repo to checkout Dockerfile from"
         default: "main"
       service_name:
         required: true
         type: string
-        description: "Name of the service for backend state key"
       stage:
         required: true
         type: string
-        description: "Environment stage (dev, stage, prod)"
       tfstate_bucket:
         required: false
         type: string
-        description: "S3 bucket name for Terraform state"
-        default: 'tfstate-dev-815817733987'
+        default: "tfstate-dev-815817733987"
       lock_table:
         required: false
         type: string
-        description: "DynamoDB table name for Terraform state locking"
-        default: 'terraform-locks-dev-815817733987'
+        default: "terraform-locks-dev-815817733987"
 
 env:
   TF_IN_AUTOMATION: "true"
@@ -68,7 +58,9 @@ env:
 
 jobs:
 
-  # Stage 1 — Authenticate with AWS OIDC
+  # -----------------------------
+  # Stage 1 — AWS OIDC Credentials
+  # -----------------------------
   creds:
     name: "AWS Credentials via OIDC"
     runs-on: ubuntu-latest
@@ -83,9 +75,7 @@ jobs:
       session_token: ${{ steps.creds.outputs.aws-session-token }}
 
     steps:
-
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
       - name: Configure AWS Credentials
         id: creds
@@ -95,11 +85,12 @@ jobs:
           aws-region: ${{ inputs.aws_region }}
           role-session-name: "oidc-session"
 
-      - name: Verify caller identity
+      - name: Verify Caller Identity
         run: aws sts get-caller-identity
 
-
-  # Stage 2 — Build Docker Image (Optional)
+  # -----------------------------
+  # Stage 2 — Docker Build (Optional)
+  # -----------------------------
   build-image:
     name: "Build Lambda Docker Image"
     needs: creds
@@ -118,10 +109,10 @@ jobs:
       IMAGE_NAME: ${{ github.repository }}/lambda-function
 
     steps:
-      - name: Checkout calling repository (service code)
+      - name: Checkout service repo
         uses: actions/checkout@v4
 
-      - name: Checkout Infra repository (for Dockerfile only)
+      - name: Checkout Infra repo (for Dockerfile)
         if: ${{ !inputs.use_local_dockerfile }}
         uses: actions/checkout@v4
         with:
@@ -129,49 +120,46 @@ jobs:
           path: _infra
           ref: ${{ inputs.branch_name }}
 
-      - name: Login to GitHub Container Registry
+      - name: Login to GHCR
         uses: docker/login-action@v3
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build and push Docker image
+      - name: Build & Push Image
         id: push
         env:
           IMAGE_TAG: ${{ github.sha }}
         run: |
-          # Convert repository name to lowercase for Docker compatibility
           IMAGE_NAME_LOWER=$(echo "$IMAGE_NAME" | tr '[:upper:]' '[:lower:]')
-          
-          # Determine Dockerfile path based on use_local_dockerfile flag
+
+          # Decide Dockerfile source
           if [ "${{ inputs.use_local_dockerfile }}" == "true" ]; then
             DOCKERFILE_PATH="${{ inputs.dockerfile_path }}"
-            echo "Using Dockerfile from calling repository: $DOCKERFILE_PATH"
           else
             DOCKERFILE_PATH="_infra/dockerfiles/${{ inputs.dockerfile_path }}"
-            echo "Using Dockerfile from Infra repository: $DOCKERFILE_PATH"
           fi
-          
+
           docker build \
             -f "$DOCKERFILE_PATH" \
             --build-arg HANDLER=${{ inputs.lambda_handler }} \
             -t $REGISTRY/$IMAGE_NAME_LOWER:$IMAGE_TAG \
             -t $REGISTRY/$IMAGE_NAME_LOWER:latest \
             ${{ inputs.lambda_code_path }}
+
           docker push $REGISTRY/$IMAGE_NAME_LOWER:$IMAGE_TAG
           docker push $REGISTRY/$IMAGE_NAME_LOWER:latest
           echo "image_uri=$REGISTRY/$IMAGE_NAME_LOWER:$IMAGE_TAG" >> $GITHUB_OUTPUT
+
+  # -----------------------------
   # Stage 3 — Terraform Plan
+  # -----------------------------
   plan:
     name: "Terraform Plan"
     needs: [creds, build-image]
     if: always() && needs.creds.result == 'success' && (needs.build-image.result == 'success' || needs.build-image.result == 'skipped')
     runs-on: ubuntu-latest
-
-    defaults:
-      run:
-        working-directory: ${{ inputs.working_directory }}
 
     env:
       AWS_ACCESS_KEY_ID: ${{ needs.creds.outputs.access_key }}
@@ -180,10 +168,12 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          path: ${{ inputs.working_directory }}
 
-      - name: Setup Backend Configuration
+      - name: Backend Config
+        working-directory: ${{ inputs.working_directory }}
         run: |
-          # Create backend config directly
           cat > backend.hcl << EOF
           bucket         = "${{ inputs.tfstate_bucket }}"
           key            = "${{ inputs.service_name }}/terraform.tfstate"
@@ -191,20 +181,15 @@ jobs:
           dynamodb_table = "${{ inputs.lock_table }}"
           encrypt        = true
           EOF
-          echo "Backend configuration:"
-          cat backend.hcl
 
-      - name: Setup Terraform
-        uses: hashicorp/setup-terraform@v3
+      - uses: hashicorp/setup-terraform@v3
 
       - name: Terraform Init
-        run: |
-          export AWS_ACCESS_KEY_ID="${{ needs.creds.outputs.access_key }}"
-          export AWS_SECRET_ACCESS_KEY="${{ needs.creds.outputs.secret_key }}"
-          export AWS_SESSION_TOKEN="${{ needs.creds.outputs.session_token }}"
-          terraform init -backend-config=backend.hcl
+        working-directory: ${{ inputs.working_directory }}
+        run: terraform init -backend-config=backend.hcl
 
       - name: Terraform Plan
+        working-directory: ${{ inputs.working_directory }}
         run: |
           if [ "${{ inputs.build_image }}" == "true" ]; then
             terraform plan \
@@ -221,24 +206,20 @@ jobs:
               -out=tfplan -no-color
           fi
 
-      - name: Upload Plan File
-        uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v4
         with:
           name: terraform-plan
           path: ${{ inputs.working_directory }}/tfplan
           retention-days: 1
 
-
+  # -----------------------------
   # Stage 4 — Terraform Apply
+  # -----------------------------
   apply:
     name: "Terraform Apply"
     needs: [creds, build-image, plan]
     if: always() && needs.plan.result == 'success'
     runs-on: ubuntu-latest
-
-    defaults:
-      run:
-        working-directory: ${{ inputs.working_directory }}
 
     env:
       AWS_ACCESS_KEY_ID: ${{ needs.creds.outputs.access_key }}
@@ -247,10 +228,12 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          path: ${{ inputs.working_directory }}
 
-      - name: Setup Backend Configuration
+      - name: Backend Config
+        working-directory: ${{ inputs.working_directory }}
         run: |
-          # Create backend config directly
           cat > backend.hcl << EOF
           bucket         = "${{ inputs.tfstate_bucket }}"
           key            = "${{ inputs.service_name }}/terraform.tfstate"
@@ -258,26 +241,20 @@ jobs:
           dynamodb_table = "${{ inputs.lock_table }}"
           encrypt        = true
           EOF
-          echo "Backend configuration:"
-          cat backend.hcl
 
-      - name: Setup Terraform
-        uses: hashicorp/setup-terraform@v3
+      - uses: hashicorp/setup-terraform@v3
 
       - name: Terraform Init
-        run: |
-          export AWS_ACCESS_KEY_ID="${{ needs.creds.outputs.access_key }}"
-          export AWS_SECRET_ACCESS_KEY="${{ needs.creds.outputs.secret_key }}"
-          export AWS_SESSION_TOKEN="${{ needs.creds.outputs.session_token }}"
-          terraform init -backend-config=backend.hcl
+        working-directory: ${{ inputs.working_directory }}
+        run: terraform init -backend-config=backend.hcl
 
-      - name: Download Plan File
-        uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v4
         with:
           name: terraform-plan
           path: ${{ inputs.working_directory }}
 
       - name: Terraform Apply
+        working-directory: ${{ inputs.working_directory }}
         run: |
           if [ "${{ inputs.build_image }}" == "true" ]; then
             terraform apply \

@@ -13,6 +13,16 @@ on:
         required: false
         type: string
         default: "."
+      lambda_code_path:
+        required: false
+        type: string
+        description: "Path to the Lambda code directory containing Dockerfile"
+        default: ""
+      build_image:
+        required: false
+        type: boolean
+        description: "Whether to build and push Docker image for Lambda"
+        default: false
 
 env:
   TF_IN_AUTOMATION: "true"
@@ -51,10 +61,51 @@ jobs:
         run: aws sts get-caller-identity
 
 
-  # Stage 2 — Terraform Plan
+  # Stage 2 — Build Docker Image (Optional)
+  build-image:
+    name: "Build Lambda Docker Image"
+    needs: creds
+    if: ${{ inputs.build_image }}
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+      packages: write
+
+    outputs:
+      image_uri: ${{ steps.push.outputs.image_uri }}
+
+    env:
+      REGISTRY: ghcr.io
+      IMAGE_NAME: ${{ github.repository }}/lambda-function
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push Docker image
+        id: push
+        env:
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          docker build -t $REGISTRY/$IMAGE_NAME:$IMAGE_TAG -t $REGISTRY/$IMAGE_NAME:latest ${{ inputs.lambda_code_path }}
+          docker push $REGISTRY/$IMAGE_NAME:$IMAGE_TAG
+          docker push $REGISTRY/$IMAGE_NAME:latest
+          echo "image_uri=$REGISTRY/$IMAGE_NAME:$IMAGE_TAG" >> $GITHUB_OUTPUT
+
+
+  # Stage 3 — Terraform Plan
   plan:
     name: "Terraform Plan"
-    needs: creds
+    needs: [creds, build-image]
+    if: always() && needs.creds.result == 'success' && (needs.build-image.result == 'success' || needs.build-image.result == 'skipped')
     runs-on: ubuntu-latest
 
     defaults:
@@ -76,7 +127,12 @@ jobs:
         run: terraform init
 
       - name: Terraform Plan
-        run: terraform plan -out=tfplan -no-color
+        run: |
+          if [ "${{ inputs.build_image }}" == "true" ]; then
+            terraform plan -var="lambda_image_uri=${{ needs.build-image.outputs.image_uri }}" -out=tfplan -no-color
+          else
+            terraform plan -out=tfplan -no-color
+          fi
 
       - name: Upload Plan File
         uses: actions/upload-artifact@v4
@@ -86,10 +142,11 @@ jobs:
           retention-days: 1
 
 
-  # Stage 3 — Terraform Apply
+  # Stage 4 — Terraform Apply
   apply:
     name: "Terraform Apply"
-    needs: [creds, plan]
+    needs: [creds, build-image, plan]
+    if: always() && needs.plan.result == 'success'
     runs-on: ubuntu-latest
 
     defaults:
@@ -117,4 +174,9 @@ jobs:
           path: ${{ inputs.working_directory }}
 
       - name: Terraform Apply
-        run: terraform apply -auto-approve tfplan
+        run: |
+          if [ "${{ inputs.build_image }}" == "true" ]; then
+            terraform apply -var="lambda_image_uri=${{ needs.build-image.outputs.image_uri }}" -auto-approve tfplan
+          else
+            terraform apply -auto-approve tfplan
+          fi

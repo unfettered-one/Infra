@@ -117,4 +117,5 @@ variable "create_http_api" {
 variable "api_spec_path" {
   description = "Path to the OpenAPI/Swagger spec file used to create the HTTP API"
   type        = string
+  default = ""
 }

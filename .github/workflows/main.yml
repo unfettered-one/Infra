@@ -58,39 +58,7 @@ env:
 jobs:
 
   ########################################################
-  # STAGE 1 — OIDC → ASSUME ROLE → EXPORT AWS CREDS
-  ########################################################
-  creds:
-    name: "AWS Credentials via OIDC"
-    runs-on: ubuntu-latest
-    steps:
-      - name: Configure AWS Credentials
-        id: creds
-        uses: aws-actions/configure-aws-credentials@v5.1.1
-        with:
-          role-to-assume: ${{ inputs.role_arn }}
-          aws-region: ${{ inputs.aws_region }}
-          role-session-name: "oidc-session"
-          output-credentials: true
-
-      - name: Verify Caller Identity
-        run: aws sts get-caller-identity
-
-      - name: Export AWS creds globally
-        run: |
-          echo "AWS_ACCESS_KEY_ID=${{ steps.creds.outputs.aws-access-key-id }}" >> $GITHUB_ENV
-          echo "AWS_SECRET_ACCESS_KEY=${{ steps.creds.outputs.aws-secret-access-key }}" >> $GITHUB_ENV
-          echo "AWS_SESSION_TOKEN=${{ steps.creds.outputs.aws-session-token }}" >> $GITHUB_ENV
-
-      - name: Confirm AWS creds exported
-        run: |
-          echo "AWS_ACCESS_KEY_ID length: ${#AWS_ACCESS_KEY_ID}"
-          echo "AWS_SECRET_ACCESS_KEY length: ${#AWS_SECRET_ACCESS_KEY}"
-          echo "AWS_SESSION_TOKEN length: ${#AWS_SESSION_TOKEN}"
-      
-
-  ########################################################
-  # STAGE 2 — DOCKER IMAGE BUILD (OPTIONAL)
+  # JOB 1 — BUILD DOCKER IMAGE (OPTIONAL)
   ########################################################
   build-image:
     name: "Build Lambda Docker Image"
@@ -153,30 +121,52 @@ jobs:
           echo "image_uri=$REGISTRY/$IMAGE_NAME_LOWER:$IMAGE_TAG" >> $GITHUB_OUTPUT
 
 
+
+
   ########################################################
-  # STAGE 3 — TERRAFORM PLAN
+  # JOB 2 — TERRAFORM PLAN
   ########################################################
   plan:
     name: "Terraform Plan"
     runs-on: ubuntu-latest
-    needs: [creds, build-image]
-    env:
-      AWS_ACCESS_KEY_ID: ${{ needs.creds.outputs.aws-access-key-id }}
-      AWS_SECRET_ACCESS_KEY: ${{ needs.creds.outputs.aws-secret-access-key }} 
-      AWS_SESSION_TOKEN: ${{ needs.creds.outputs.aws-session-token }}
+    if: ${{ !inputs.build_image || success() }}
+
+    permissions:
+      id-token: write
+      contents: read
+
     steps:
-      - uses: aws-actions/configure-aws-credentials@v5.1.1
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS Credentials
+        uses: ./.github/actions/aws-credentials
         with:
-          aws-access-key-id: ${{ needs.creds.outputs.aws-access-key-id }}
-          aws-secret-access-key: ${{ needs.creds.outputs.aws-secret-access-key }}
-          aws-session-token: ${{ needs.creds.outputs.aws-session-token }}
-          aws-region: ${{ inputs.aws_region }}
-      - name: Confirm AWS creds exported
+          role_arn: ${{ inputs.role_arn }}
+          aws_region: ${{ inputs.aws_region }}
+
+      - name: Wait for Docker Image (if needed)
+        if: ${{ inputs.build_image }}
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const build_image_run = await github.rest.actions.listJobsForWorkflowRun({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              run_id: context.runId,
+            });
+            const buildJob = build_image_run.data.jobs.find(job => job.name.includes('Build Lambda Docker Image'));
+            if (buildJob && buildJob.status !== 'completed') {
+              console.log('Waiting for build-image job to complete...');
+              throw new Error('build-image job not yet complete, will retry');
+            }
+
+      - name: Get Image URI
+        if: ${{ inputs.build_image }}
+        id: get_image
         run: |
-          echo "gih env : ${GITHUB_ENV}"
-          echo "AWS_ACCESS_KEY_ID length: ${#AWS_ACCESS_KEY_ID}"
-          echo "AWS_SECRET_ACCESS_KEY length: ${#AWS_SECRET_ACCESS_KEY}"
-          echo "AWS_SESSION_TOKEN length: ${#AWS_SESSION_TOKEN}"
+          echo "Fetching image URI from build-image job outputs"
+          # This will be available from the build-image job outputs
+
       - name: Create backend.hcl
         working-directory: ${{ inputs.working_directory }}
         run: |
@@ -189,13 +179,6 @@ jobs:
           EOF
 
       - uses: hashicorp/setup-terraform@v3
-
-      - name: Debug AWS credentials
-        working-directory: ${{ inputs.working_directory }}
-        run: |
-          echo "AWS_ACCESS_KEY_ID length: ${#AWS_ACCESS_KEY_ID}"
-          echo "AWS_SECRET_ACCESS_KEY length: ${#AWS_SECRET_ACCESS_KEY}"
-          echo "AWS_SESSION_TOKEN length: ${#AWS_SESSION_TOKEN}"
 
       - name: Terraform Init
         working-directory: ${{ inputs.working_directory }}
@@ -226,15 +209,25 @@ jobs:
 
 
   ########################################################
-  # STAGE 4 — TERRAFORM APPLY
+  # JOB 3 — TERRAFORM APPLY
   ########################################################
   apply:
     name: "Terraform Apply"
     runs-on: ubuntu-latest
     needs: plan
 
+    permissions:
+      id-token: write
+      contents: read
+
     steps:
       - uses: actions/checkout@v4
+
+      - name: Configure AWS Credentials
+        uses: ./.github/actions/aws-credentials
+        with:
+          role_arn: ${{ inputs.role_arn }}
+          aws_region: ${{ inputs.aws_region }}
 
       - name: Create backend.hcl
         working-directory: ${{ inputs.working_directory }}

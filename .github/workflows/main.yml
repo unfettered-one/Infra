@@ -151,22 +151,6 @@ jobs:
           role_arn: ${{ inputs.role_arn }}
           aws_region: ${{ inputs.aws_region }}
 
-      - name: Wait for Docker Image (if needed)
-        if: ${{ inputs.build_image }}
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const build_image_run = await github.rest.actions.listJobsForWorkflowRun({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              run_id: context.runId,
-            });
-            const buildJob = build_image_run.data.jobs.find(job => job.name.includes('Build Lambda Docker Image'));
-            if (buildJob && buildJob.status !== 'completed') {
-              console.log('Waiting for build-image job to complete...');
-              throw new Error('build-image job not yet complete, will retry');
-            }
-
       - name: Get Image URI
         if: ${{ inputs.build_image }}
         id: get_image
@@ -190,14 +174,6 @@ jobs:
       - name: Terraform Init
         working-directory: ${{ inputs.working_directory }}
         run: terraform init -backend-config=backend.hcl
-
-      - name: Debug Image URI
-        if: ${{ inputs.build_image }}
-        run: |
-          echo "Image URI from build-image job: ${{ needs['build-image'].outputs.image_uri }}"
-          echo "Length: ${#IMAGE_URI}"
-        env:
-          IMAGE_URI: ${{ needs['build-image'].outputs.image_uri }}
 
       - name: Terraform Plan
         working-directory: ${{ inputs.working_directory }}

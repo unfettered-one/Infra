@@ -137,8 +137,15 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Checkout Infra repo for composite action
+        uses: actions/checkout@v4
+        with:
+          repository: unfettered-one/Infra
+          path: _infra
+          ref: ${{ inputs.branch_name }}
+
       - name: Configure AWS Credentials
-        uses: ./.github/actions/aws-credentials
+        uses: ./_infra/.github/actions/aws-credentials
         with:
           role_arn: ${{ inputs.role_arn }}
           aws_region: ${{ inputs.aws_region }}
@@ -222,8 +229,15 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Checkout Infra repo for composite action
+        uses: actions/checkout@v4
+        with:
+          repository: unfettered-one/Infra
+          path: _infra
+          ref: ${{ inputs.branch_name }}
+
       - name: Configure AWS Credentials
-        uses: ./.github/actions/aws-credentials
+        uses: ./_infra/.github/actions/aws-credentials
         with:
           role_arn: ${{ inputs.role_arn }}
           aws_region: ${{ inputs.aws_region }}

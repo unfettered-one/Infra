@@ -169,7 +169,12 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
-
+      - name: Confirm AWS creds exported
+        run: |
+          echo "gih env : ${GITHUB_ENV}"
+          echo "AWS_ACCESS_KEY_ID length: ${#AWS_ACCESS_KEY_ID}"
+          echo "AWS_SECRET_ACCESS_KEY length: ${#AWS_SECRET_ACCESS_KEY}"
+          echo "AWS_SESSION_TOKEN length: ${#AWS_SESSION_TOKEN}"
       - name: Create backend.hcl
         working-directory: ${{ inputs.working_directory }}
         run: |

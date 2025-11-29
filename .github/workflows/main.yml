@@ -63,7 +63,6 @@ jobs:
   build-image:
     name: "Build Lambda Docker Image"
     runs-on: ubuntu-latest
-    needs: creds
     if: ${{ inputs.build_image }}
 
     permissions:

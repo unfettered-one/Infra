@@ -67,7 +67,10 @@ jobs:
     permissions:
       id-token: write
       contents: read
-
+    outputs:
+      aws-access-key-id: ${{ steps.creds.outputs.aws-access-key-id }}
+      aws-secret-access-key: ${{ steps.creds.outputs.aws-secret-access-key }}
+      aws-session-token: ${{ steps.creds.outputs.aws-session-token }}
     steps:
       - uses: actions/checkout@v4
 
@@ -94,6 +97,7 @@ jobs:
           echo "AWS_ACCESS_KEY_ID length: ${#AWS_ACCESS_KEY_ID}"
           echo "AWS_SECRET_ACCESS_KEY length: ${#AWS_SECRET_ACCESS_KEY}"
           echo "AWS_SESSION_TOKEN length: ${#AWS_SESSION_TOKEN}"
+      
 
   ########################################################
   # STAGE 2 — DOCKER IMAGE BUILD (OPTIONAL)
@@ -166,7 +170,10 @@ jobs:
     name: "Terraform Plan"
     runs-on: ubuntu-latest
     needs: [creds, build-image]
-
+    env:
+      AWS_ACCESS_KEY_ID: ${{ needs.creds.outputs.aws-access-key-id }}
+      AWS_SECRET_ACCESS_KEY: ${{ needs.creds.outputs.aws-secret-access-key }} 
+      AWS_SESSION_TOKEN: ${{ needs.creds.outputs.aws-session-token }}
     steps:
       - uses: actions/checkout@v4
       - name: Confirm AWS creds exported

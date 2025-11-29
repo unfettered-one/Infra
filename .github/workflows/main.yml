@@ -180,7 +180,7 @@ jobs:
           bucket         = "${{ inputs.tfstate_bucket }}"
           key            = "${{ inputs.service_name }}/terraform.tfstate"
           region         = "${{ inputs.aws_region }}"
-          dynamodb_table = "${{ inputs.lock_table }}"
+          use_lockfile = "${{ inputs.lock_table }}"
           encrypt        = true
           EOF
 
@@ -199,6 +199,8 @@ jobs:
               -var="region=${{ inputs.aws_region }}" \
               -var="stage=${{ inputs.stage }}" \
               -var="service_name=${{ inputs.service_name }}" \
+              -var="lock_table=${{ inputs.lock_table }}" \
+              -var="lock_bucket=${{ inputs.tfstate_bucket }}" \
               -out=tfplan
           else
             terraform plan \

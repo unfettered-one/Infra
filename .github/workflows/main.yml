@@ -63,17 +63,7 @@ jobs:
   creds:
     name: "AWS Credentials via OIDC"
     runs-on: ubuntu-latest
-
-    permissions:
-      id-token: write
-      contents: read
-    outputs:
-      aws-access-key-id: ${{ steps.creds.outputs.aws-access-key-id }}
-      aws-secret-access-key: ${{ steps.creds.outputs.aws-secret-access-key }}
-      aws-session-token: ${{ steps.creds.outputs.aws-session-token }}
     steps:
-      - uses: actions/checkout@v4
-
       - name: Configure AWS Credentials
         id: creds
         uses: aws-actions/configure-aws-credentials@v5.1.1
@@ -175,7 +165,12 @@ jobs:
       AWS_SECRET_ACCESS_KEY: ${{ needs.creds.outputs.aws-secret-access-key }} 
       AWS_SESSION_TOKEN: ${{ needs.creds.outputs.aws-session-token }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: aws-actions/configure-aws-credentials@v5.1.1
+        with:
+          aws-access-key-id: ${{ needs.creds.outputs.aws-access-key-id }}
+          aws-secret-access-key: ${{ needs.creds.outputs.aws-secret-access-key }}
+          aws-session-token: ${{ needs.creds.outputs.aws-session-token }}
+          aws-region: ${{ inputs.aws_region }}
       - name: Confirm AWS creds exported
         run: |
           echo "gih env : ${GITHUB_ENV}"

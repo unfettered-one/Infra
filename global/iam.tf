@@ -74,10 +74,7 @@ data "aws_iam_policy_document" "terraform_deploy_policy" {
       "dynamodb:*",
       "logs:*",
       "ssm:*",
-      "iam:PassRole",
-      "iam:GetRole",
-      "iam:CreateRole",
-      "iam:AttachRolePolicy"
+      "iam:*",
     ]
     resources = ["*"]
   }

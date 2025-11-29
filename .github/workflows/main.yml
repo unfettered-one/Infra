@@ -128,6 +128,7 @@ jobs:
   plan:
     name: "Terraform Plan"
     runs-on: ubuntu-latest
+    needs: build-image
     if: ${{ !inputs.build_image || success() }}
 
     permissions:
@@ -189,6 +190,14 @@ jobs:
       - name: Terraform Init
         working-directory: ${{ inputs.working_directory }}
         run: terraform init -backend-config=backend.hcl
+
+      - name: Debug Image URI
+        if: ${{ inputs.build_image }}
+        run: |
+          echo "Image URI from build-image job: ${{ needs['build-image'].outputs.image_uri }}"
+          echo "Length: ${#IMAGE_URI}"
+        env:
+          IMAGE_URI: ${{ needs['build-image'].outputs.image_uri }}
 
       - name: Terraform Plan
         working-directory: ${{ inputs.working_directory }}

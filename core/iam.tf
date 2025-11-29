@@ -20,7 +20,7 @@ resource "null_resource" "policy_arn_validation" {
   triggers = {
     check = (length(var.lambda_execution_policy_arn) > 0 ?
       "ok" :
-      throw("ERROR: lambda_execution_policy_arn is required. Please pass a valid IAM policy ARN.")
+      error("ERROR: lambda_execution_policy_arn is required. Please pass a valid IAM policy ARN.")
   ) }
 }
 

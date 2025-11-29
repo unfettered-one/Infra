@@ -37,19 +37,19 @@ locals {
 # Validation Resources to enforce checks
 resource "null_resource" "lambda_mode_validation" {
   triggers = {
-    check = local.lambda_mode_error != "" ? throw(local.lambda_mode_error) : "ok"
+    check = local.lambda_mode_error != "" ? error(local.lambda_mode_error) : "ok"
   }
 }
 
 resource "null_resource" "lambda_image_uri_validation" {
   triggers = {
-    check = local.image_uri_error != "" ? throw(local.image_uri_error) : "ok"
+    check = local.image_uri_error != "" ? error(local.image_uri_error) : "ok"
   }
 }
 
 resource "null_resource" "lambda_zip_path_validation" {
   triggers = {
-    check = local.zip_path_error != "" ? throw(local.zip_path_error) : "ok"
+    check = local.zip_path_error != "" ? error(local.zip_path_error) : "ok"
   }
 }
 
@@ -57,7 +57,7 @@ resource "null_resource" "validate_lambda_policy" {
   triggers = {
     check = (length(var.lambda_execution_policy_arn) > 0 ?
       "ok" :
-      throw("ERROR: lambda_execution_policy_arn must be provided.")
+      error("ERROR: lambda_execution_policy_arn must be provided.")
   ) }
 }
 

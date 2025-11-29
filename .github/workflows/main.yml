@@ -50,6 +50,11 @@ on:
         required: false
         type: string
         default: "terraform-locks-dev-815817733987"
+      ecr_repository_url:
+        required: false
+        type: string
+        description: "ECR repository URL for pushing Lambda images"
+        default: "815817733987.dkr.ecr.ap-south-1.amazonaws.com/lambda-images"
 
 env:
   TF_IN_AUTOMATION: "true"
@@ -66,15 +71,11 @@ jobs:
     if: ${{ inputs.build_image }}
 
     permissions:
+      id-token: write
       contents: read
-      packages: write
 
     outputs:
       image_uri: ${{ steps.push.outputs.image_uri }}
-
-    env:
-      REGISTRY: ghcr.io
-      IMAGE_NAME: ${{ github.repository }}/lambda-function
 
     steps:
       - uses: actions/checkout@v4
@@ -87,20 +88,30 @@ jobs:
           path: _infra
           ref: ${{ inputs.branch_name }}
 
-      - name: GHCR Login
-        uses: docker/login-action@v3
+      - name: Checkout Infra repo for composite action
+        uses: actions/checkout@v4
         with:
-          registry: ${{ env.REGISTRY }}
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+          repository: unfettered-one/Infra
+          path: _infra_actions
+          ref: ${{ inputs.branch_name }}
 
-      - name: Build & Push Docker Image
+      - name: Configure AWS Credentials
+        uses: ./_infra_actions/.github/actions/aws-credentials
+        with:
+          role_arn: ${{ inputs.role_arn }}
+          aws_region: ${{ inputs.aws_region }}
+
+      - name: Login to Amazon ECR
+        id: ecr-login
+        run: |
+          aws ecr get-login-password --region ${{ inputs.aws_region }} | docker login --username AWS --password-stdin $(echo ${{ inputs.ecr_repository_url }} | cut -d'/' -f1)
+
+      - name: Build & Push Docker Image to ECR
         id: push
         env:
           IMAGE_TAG: ${{ github.sha }}
+          ECR_REPO: ${{ inputs.ecr_repository_url }}
         run: |
-          IMAGE_NAME_LOWER=$(echo "$IMAGE_NAME" | tr '[:upper:]' '[:lower:]')
-
           if [ "${{ inputs.use_local_dockerfile }}" == "true" ]; then
             DOCKERFILE_PATH="${{ inputs.dockerfile_path }}"
           else
@@ -110,14 +121,14 @@ jobs:
           docker build \
             -f "$DOCKERFILE_PATH" \
             --build-arg HANDLER=${{ inputs.lambda_handler }} \
-            -t $REGISTRY/$IMAGE_NAME_LOWER:$IMAGE_TAG \
-            -t $REGISTRY/$IMAGE_NAME_LOWER:latest \
+            -t $ECR_REPO:$IMAGE_TAG \
+            -t $ECR_REPO:latest \
             ${{ inputs.lambda_code_path }}
 
-          docker push $REGISTRY/$IMAGE_NAME_LOWER:$IMAGE_TAG
-          docker push $REGISTRY/$IMAGE_NAME_LOWER:latest
+          docker push $ECR_REPO:$IMAGE_TAG
+          docker push $ECR_REPO:latest
 
-          echo "image_uri=$REGISTRY/$IMAGE_NAME_LOWER:$IMAGE_TAG" >> $GITHUB_OUTPUT
+          echo "image_uri=$ECR_REPO:$IMAGE_TAG" >> $GITHUB_OUTPUT
 
 
 

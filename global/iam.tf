@@ -75,6 +75,7 @@ data "aws_iam_policy_document" "terraform_deploy_policy" {
       "logs:*",
       "ssm:*",
       "iam:*",
+      "ecr:*"
     ]
     resources = ["*"]
   }

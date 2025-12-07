@@ -11,6 +11,16 @@ resource "aws_dynamodb_table" "service_table" {
     name = "pk"
     type = "S"
   }
+  attribute {
+    name = var.new_attribute
+    type = "S"
+  }
+
+  global_secondary_index {
+    name            = var.gsi
+    hash_key        = var.new_attribute
+    projection_type = "ALL"
+  }
 
   tags = {
     ManagedBy = "UnfetteredOne"

@@ -93,6 +93,18 @@ variable "dynamodb_table_name" {
   default     = ""
 }
 
+variable "gsi" {
+  description = "name of global secodary index"
+  type        = string
+  default     = ""
+}
+
+variable "new_attribute" {
+  description = "New attribute for DynamoDB table"
+  type        = string
+  default     = ""
+}
+
 
 # IAM Role & Policies
 variable "lambda_execution_policy_arn" {
@@ -117,5 +129,5 @@ variable "create_http_api" {
 variable "api_spec_path" {
   description = "Path to the OpenAPI/Swagger spec file used to create the HTTP API"
   type        = string
-  default = ""
+  default     = ""
 }

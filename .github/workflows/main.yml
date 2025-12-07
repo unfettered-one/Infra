@@ -10,9 +10,51 @@ on:
         required: true
         type: string
       working_directory:
+        required: true
+        type: string
+      lambda_code_path:
         required: false
         type: string
-        default: "."
+        default: ""
+      dockerfile_path:
+        required: false
+        type: string
+        default: "lambda-python.Dockerfile"
+      use_local_dockerfile:
+        required: false
+        type: boolean
+        default: false
+      lambda_handler:
+        required: false
+        type: string
+        default: "app.lambda_handler"
+      build_image:
+        required: false
+        type: boolean
+        default: false
+      branch_name:
+        required: false
+        type: string
+        default: "main"
+      service_name:
+        required: true
+        type: string
+      stage:
+        required: true
+        type: string
+      tfstate_bucket:
+        required: false
+        type: string
+        default: "tfstate-dev-815817733987"
+      lock_table:
+        required: false
+        type: string
+        default: "terraform-locks-dev-815817733987"
+      ecr_repository_url:
+        required: false
+        type: string
+        description: "ECR repository URL for pushing Lambda images"
+        default: "815817733987.dkr.ecr.ap-south-1.amazonaws.com/lambda-images"
 
 env:
   TF_IN_AUTOMATION: "true"
@@ -20,101 +62,206 @@ env:
 
 jobs:
 
-  # Stage 1 — Authenticate with AWS OIDC
-  creds:
-    name: "AWS Credentials via OIDC"
+  ########################################################
+  # JOB 1 — BUILD DOCKER IMAGE (OPTIONAL)
+  ########################################################
+  build-image:
+    name: "Build Lambda Docker Image"
     runs-on: ubuntu-latest
+    if: ${{ inputs.build_image }}
 
     permissions:
       id-token: write
       contents: read
 
     outputs:
-      access_key: ${{ steps.creds.outputs.aws-access-key-id }}
-      secret_key: ${{ steps.creds.outputs.aws-secret-access-key }}
-      session_token: ${{ steps.creds.outputs.aws-session-token }}
-
-    steps:
-
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Configure AWS Credentials
-        id: creds
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          role-to-assume: ${{ inputs.role_arn }}
-          aws-region: ${{ inputs.aws_region }}
-          role-session-name: "oidc-session"
-
-      - name: Verify caller identity
-        run: aws sts get-caller-identity
-
-
-  # Stage 2 — Terraform Plan
-  plan:
-    name: "Terraform Plan"
-    needs: creds
-    runs-on: ubuntu-latest
-
-    defaults:
-      run:
-        working-directory: ${{ inputs.working_directory }}
-
-    env:
-      AWS_ACCESS_KEY_ID: ${{ needs.creds.outputs.access_key }}
-      AWS_SECRET_ACCESS_KEY: ${{ needs.creds.outputs.secret_key }}
-      AWS_SESSION_TOKEN: ${{ needs.creds.outputs.session_token }}
+      image_uri: ${{ steps.push.outputs.image_uri }}
 
     steps:
       - uses: actions/checkout@v4
 
-      - name: Setup Terraform
-        uses: hashicorp/setup-terraform@v3
+      - name: Checkout Infra repo for Dockerfile
+        if: ${{ !inputs.use_local_dockerfile }}
+        uses: actions/checkout@v4
+        with:
+          repository: unfettered-one/Infra
+          path: _infra
+          ref: ${{ inputs.branch_name }}
+
+      - name: Checkout Infra repo for composite action
+        uses: actions/checkout@v4
+        with:
+          repository: unfettered-one/Infra
+          path: _infra_actions
+          ref: ${{ inputs.branch_name }}
+
+      - name: Configure AWS Credentials
+        uses: ./_infra_actions/.github/actions/aws-credentials
+        with:
+          role_arn: ${{ inputs.role_arn }}
+          aws_region: ${{ inputs.aws_region }}
+
+      - name: Login to Amazon ECR
+        id: ecr-login
+        run: |
+          aws ecr get-login-password --region ${{ inputs.aws_region }} | docker login --username AWS --password-stdin $(echo ${{ inputs.ecr_repository_url }} | cut -d'/' -f1)
+
+      - name: Build & Push Docker Image to ECR
+        id: push
+        env:
+          IMAGE_TAG: ${{ github.sha }}
+          ECR_REPO: ${{ inputs.ecr_repository_url }}
+        run: |
+          if [ "${{ inputs.use_local_dockerfile }}" == "true" ]; then
+            DOCKERFILE_PATH="${{ inputs.dockerfile_path }}"
+          else
+            DOCKERFILE_PATH="_infra/dockerfiles/${{ inputs.dockerfile_path }}"
+          fi
+
+          docker build \
+            -f "$DOCKERFILE_PATH" \
+            --build-arg HANDLER=${{ inputs.lambda_handler }} \
+            -t $ECR_REPO:$IMAGE_TAG \
+            -t $ECR_REPO:latest \
+            ${{ inputs.lambda_code_path }}
+
+          docker push $ECR_REPO:$IMAGE_TAG
+          docker push $ECR_REPO:latest
+
+          echo "image_uri=$ECR_REPO:$IMAGE_TAG" >> $GITHUB_OUTPUT
+
+
+
+
+  ########################################################
+  # JOB 2 — TERRAFORM PLAN
+  ########################################################
+  plan:
+    name: "Terraform Plan"
+    runs-on: ubuntu-latest
+    needs: build-image
+    if: ${{ !inputs.build_image || success() }}
+
+    permissions:
+      id-token: write
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Checkout Infra repo for composite action
+        uses: actions/checkout@v4
+        with:
+          repository: unfettered-one/Infra
+          path: _infra
+          ref: ${{ inputs.branch_name }}
+
+      - name: Configure AWS Credentials
+        uses: ./_infra/.github/actions/aws-credentials
+        with:
+          role_arn: ${{ inputs.role_arn }}
+          aws_region: ${{ inputs.aws_region }}
+
+      - name: Get Image URI
+        if: ${{ inputs.build_image }}
+        id: get_image
+        run: |
+          echo "Fetching image URI from build-image job outputs"
+          # This will be available from the build-image job outputs
+
+      - name: Create backend.hcl
+        working-directory: ${{ inputs.working_directory }}
+        run: |
+          cat > backend.hcl << EOF
+          bucket         = "${{ inputs.tfstate_bucket }}"
+          key            = "${{ inputs.service_name }}/terraform.tfstate"
+          region         = "${{ inputs.aws_region }}"
+          dynamodb_table = "${{ inputs.lock_table }}"
+          encrypt        = true
+          EOF
+
+      - uses: hashicorp/setup-terraform@v3
 
       - name: Terraform Init
-        run: terraform init
+        working-directory: ${{ inputs.working_directory }}
+        run: terraform init -backend-config=backend.hcl
 
       - name: Terraform Plan
-        run: terraform plan -out=tfplan -no-color
+        working-directory: ${{ inputs.working_directory }}
+        run: |
+          if [ "${{ inputs.build_image }}" == "true" ]; then
+            terraform plan \
+              -var="lambda_image_uri=${{ needs['build-image'].outputs.image_uri }}" \
+              -var="region=${{ inputs.aws_region }}" \
+              -var="stage=${{ inputs.stage }}" \
+              -var="service_name=${{ inputs.service_name }}" \
+              -var="lock_table=${{ inputs.lock_table }}" \
+              -var="lock_bucket=${{ inputs.tfstate_bucket }}" \
+              -out=tfplan
+          else
+            terraform plan \
+              -var="region=${{ inputs.aws_region }}" \
+              -var="stage=${{ inputs.stage }}" \
+              -var="service_name=${{ inputs.service_name }}" \
+              -out=tfplan
+          fi
 
-      - name: Upload Plan File
-        uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v4
         with:
           name: terraform-plan
           path: ${{ inputs.working_directory }}/tfplan
-          retention-days: 1
 
 
-  # Stage 3 — Terraform Apply
+  ########################################################
+  # JOB 3 — TERRAFORM APPLY
+  ########################################################
   apply:
     name: "Terraform Apply"
-    needs: [creds, plan]
     runs-on: ubuntu-latest
+    needs: plan
 
-    defaults:
-      run:
-        working-directory: ${{ inputs.working_directory }}
-
-    env:
-      AWS_ACCESS_KEY_ID: ${{ needs.creds.outputs.access_key }}
-      AWS_SECRET_ACCESS_KEY: ${{ needs.creds.outputs.secret_key }}
-      AWS_SESSION_TOKEN: ${{ needs.creds.outputs.session_token }}
+    permissions:
+      id-token: write
+      contents: read
 
     steps:
       - uses: actions/checkout@v4
 
-      - name: Setup Terraform
-        uses: hashicorp/setup-terraform@v3
+      - name: Checkout Infra repo for composite action
+        uses: actions/checkout@v4
+        with:
+          repository: unfettered-one/Infra
+          path: _infra
+          ref: ${{ inputs.branch_name }}
+
+      - name: Configure AWS Credentials
+        uses: ./_infra/.github/actions/aws-credentials
+        with:
+          role_arn: ${{ inputs.role_arn }}
+          aws_region: ${{ inputs.aws_region }}
+
+      - name: Create backend.hcl
+        working-directory: ${{ inputs.working_directory }}
+        run: |
+          cat > backend.hcl << EOF
+          bucket         = "${{ inputs.tfstate_bucket }}"
+          key            = "${{ inputs.service_name }}/terraform.tfstate}"
+          region         = "${{ inputs.aws_region }}"
+          dynamodb_table = "${{ inputs.lock_table }}"
+          encrypt        = true
+          EOF
+
+      - uses: hashicorp/setup-terraform@v3
 
       - name: Terraform Init
-        run: terraform init
+        working-directory: ${{ inputs.working_directory }}
+        run: terraform init -backend-config=backend.hcl
 
-      - name: Download Plan File
-        uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v4
         with:
           name: terraform-plan
           path: ${{ inputs.working_directory }}
 
       - name: Terraform Apply
+        working-directory: ${{ inputs.working_directory }}
         run: terraform apply -auto-approve tfplan

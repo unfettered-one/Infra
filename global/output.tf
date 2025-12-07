@@ -20,7 +20,23 @@ output "stage" {
 }
 
 # Output: AWS region
-output "region" {
+output "aws_region" {
   description = "AWS region used to deploy resources"
-  value       = var.region
+  value       = var.aws_region
+}
+
+# ECR Repository outputs
+output "ecr_repository_url" {
+  description = "URL of the ECR repository for pushing images"
+  value       = aws_ecr_repository.lambda_images.repository_url
+}
+
+output "ecr_repository_name" {
+  description = "Name of the ECR repository"
+  value       = aws_ecr_repository.lambda_images.name
+}
+
+output "ecr_repository_arn" {
+  description = "ARN of the ECR repository"
+  value       = aws_ecr_repository.lambda_images.arn
 }

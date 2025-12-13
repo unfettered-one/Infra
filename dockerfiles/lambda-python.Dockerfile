@@ -14,15 +14,16 @@ SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 # Copy all service code to Lambda task root
 COPY ${SERVICE}/ ${LAMBDA_TASK_ROOT}/${SERVICE}/
 
-
+RUN touch \
+    ${LAMBDA_TASK_ROOT}/${SERVICE}/__init__.py 
 
 # Install dependencies - prioritize setup.py, fallback to requirements.txt
 RUN if [ -f ${SERVICE}/setup.py ]; then \
     echo "Installing dependencies from setup.py..."; \
-    pip install --no-cache-dir "./${SERVICE}" --target "/opt/python"; \
+    pip install --no-cache-dir "./${SERVICE}" --target "${LAMBDA_TASK_ROOT}"; \
     elif [ -f ${SERVICE}/requirements.txt ]; then \
     echo "Installing dependencies from requirements.txt..."; \
-    pip install --upgrade --no-cache-dir -r ${SERVICE}/requirements.txt --target "/opt/python"; \ 
+    pip install --upgrade --no-cache-dir -r ${SERVICE}/requirements.txt --target "${LAMBDA_TASK_ROOT}"; \ 
     else \
     echo "No dependency file found (setup.py or requirements.txt). Skipping..."; \
     fi

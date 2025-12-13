@@ -70,6 +70,7 @@ resource "aws_lambda_function" "container_lambda" {
 
   package_type = "Image"
   image_uri    = local.final_image_uri
+  # Handler must be specified here since Dockerfile has no CMD
   image_config {
     command = [var.lambda_handler]
   }

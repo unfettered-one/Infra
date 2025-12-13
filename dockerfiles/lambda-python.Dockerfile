@@ -12,7 +12,7 @@ COPY . ${LAMBDA_TASK_ROOT}/
 
 # Set working directory
 WORKDIR ${LAMBDA_TASK_ROOT}
-
+RUN echo "Contents of ${LAMBDA_TASK_ROOT}:" && ls -la ${LAMBDA_TASK_ROOT} || true
 # Install dependencies - prioritize setup.py, fallback to requirements.txt
 RUN if [ -f setup.py ]; then \
     echo "Installing dependencies from setup.py..."; \

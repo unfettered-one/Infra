@@ -120,7 +120,7 @@ jobs:
           fi
 
           docker build \
-            -f "$DOCKERFILE_PATH" \\
+            -f "$DOCKERFILE_PATH" \
             --build-arg EXEC_SCRIPT=${{ inputs.main_file }} \
             --build-arg SERVICE=${{inputs.lambda_code_path}} \
             -t $ECR_REPO:$IMAGE_TAG \

@@ -21,7 +21,8 @@ RUN if [ -f ${SERVICE}/setup.py ]; then \
     pip install --upgrade --no-cache-dir "./${SERVICE}" --target "${LAMBDA_TASK_ROOT}"; \
     elif [ -f ${SERVICE}/requirements.txt ]; then \
     echo "Installing dependencies from requirements.txt..."; \
-    pip install --upgrade --no-cache-dir -r ${SERVICE}/requirements.txt --target "${LAMBDA_TASK_ROOT}"; \
+    pip install --upgrade --no-cache-dir -r ${SERVICE}/requirements.txt --target "${LAMBDA_TASK_ROOT}"; \ 
+    awslambdaric; \
     else \
     echo "No dependency file found (setup.py or requirements.txt). Skipping..."; \
     fi

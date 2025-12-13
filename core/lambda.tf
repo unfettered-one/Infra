@@ -87,9 +87,32 @@ resource "aws_lambda_function" "container_lambda" {
 }
 
 
+# Lambda Function URL (only created when a Lambda is created)
+resource "aws_lambda_function_url" "function_url" {
+  count = (var.use_zip || var.use_container) ? 1 : 0
+
+  function_name = var.use_zip ? aws_lambda_function.zip_lambda[0].function_name : aws_lambda_function.container_lambda[0].function_name
+
+  # Publicly callable by default; change to "AWS_IAM" to require IAM auth
+  authorization_type = "NONE"
+
+  # Allow CORS from anywhere by default so the URL is reachable from browsers
+  cors {
+    allow_origins  = ["*"]
+    allow_methods  = ["GET", "POST", "PUT", "DELETE", "OPTIONS"]
+    allow_headers  = ["*"]
+    expose_headers = ["*"]
+    max_age        = 3600
+  }
+}
 
 
 
-# Outputs
-
-
+resource "aws_lambda_permission" "allow_public_url" {
+  count = (var.use_zip || var.use_container) ? 1 : 0
+  statement_id           = "AllowFunctionUrlInvoke"
+  action                 = "lambda:InvokeFunctionUrl"
+  function_name          = var.use_zip ? aws_lambda_function.zip_lambda[0].function_name : aws_lambda_function.container_lambda[0].function_name
+  principal              = "*"
+  function_url_auth_type = "NONE"
+}

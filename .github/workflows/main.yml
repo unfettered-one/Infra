@@ -61,7 +61,6 @@ env:
   TF_INPUT: "false"
 
 jobs:
-
   ########################################################
   # JOB 1 — BUILD DOCKER IMAGE (OPTIONAL)
   ########################################################
@@ -129,9 +128,6 @@ jobs:
           docker push $ECR_REPO:latest
 
           echo "image_uri=$ECR_REPO:$IMAGE_TAG" >> $GITHUB_OUTPUT
-
-
-
 
   ########################################################
   # JOB 2 — TERRAFORM PLAN
@@ -210,7 +206,6 @@ jobs:
         with:
           name: terraform-plan
           path: ${{ inputs.working_directory }}/tfplan
-
 
   ########################################################
   # JOB 3 — TERRAFORM APPLY

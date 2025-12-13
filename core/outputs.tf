@@ -33,3 +33,8 @@ output "http_api_id" {
 output "http_api_endpoint" {
   value = var.create_http_api ? aws_apigatewayv2_api.http_api[0].api_endpoint : null
 }
+
+output "lambda_function_url" {
+  description = "Function URL for the Lambda, if created"
+  value       = try(aws_lambda_function_url.function_url[0].function_url, null)
+}

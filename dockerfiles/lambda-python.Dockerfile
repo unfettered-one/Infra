@@ -35,7 +35,7 @@ RUN if [ -n "${EXEC_SCRIPT}" ] && [ -f "${LAMBDA_TASK_ROOT}/${SERVICE}/${EXEC_SC
     echo "No EXEC_SCRIPT provided or file not found; skipping chmod."; \
     fi
 RUN echo "Contents of ${LAMBDA_TASK_ROOT}/${SERVICE}/:" && ls -la ${LAMBDA_TASK_ROOT}/${SERVICE}/
-RUN echo "Contents of /opt/python/:" && ls -la /opt/python | sed -n '1,20p'
+RUN echo "Contents of /opt/python/:" && ls -la /opt/python 
 # Set the CMD to your handler (can be overridden at runtime)
 # CMD [ "${HANDLER}" ]
 

@@ -7,13 +7,14 @@ FROM public.ecr.aws/lambda/python:3.11
 # Accept handler as build argument (can be overridden at build time)
 ARG EXEC_SCRIPT=""
 ARG SERVICE=""
+# Set working directory
+WORKDIR ${LAMBDA_TASK_ROOT}
 
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 # Copy all service code to Lambda task root
 COPY . ${LAMBDA_TASK_ROOT}/${SERVICE}/
 
-# Set working directory
-WORKDIR ${LAMBDA_TASK_ROOT}
+
 
 # Install dependencies - prioritize setup.py, fallback to requirements.txt
 RUN if [ -f ${SERVICE}/setup.py ]; then \

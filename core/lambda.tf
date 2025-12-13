@@ -70,6 +70,9 @@ resource "aws_lambda_function" "container_lambda" {
 
   package_type = "Image"
   image_uri    = local.final_image_uri
+  image_config {
+    command = [var.lambda_handler]
+  }
 
   role = aws_iam_role.lambda_exec_role.arn
 

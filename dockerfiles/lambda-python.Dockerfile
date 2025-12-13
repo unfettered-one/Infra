@@ -5,7 +5,6 @@
 FROM public.ecr.aws/lambda/python:3.11
 
 # Accept handler as build argument (can be overridden at build time)
-ARG HANDLER=""
 ARG EXEC_SCRIPT=""
 ARG SERVICE=""
 

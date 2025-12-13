@@ -119,3 +119,11 @@ resource "aws_lambda_permission" "allow_public_url" {
     aws_lambda_function_url.function_url
   ]
 }
+
+resource "aws_lambda_permission" "allow_public_invoke" {
+  count         = (var.use_zip || var.use_container) ? 1 : 0
+  statement_id  = "AllowPublicInvoke"
+  action        = "lambda:InvokeFunction"
+  function_name = var.use_zip ? aws_lambda_function.zip_lambda[0].function_name : aws_lambda_function.container_lambda[0].function_name
+  principal     = "*"
+}

@@ -19,7 +19,7 @@ COPY . ${LAMBDA_TASK_ROOT}/${SERVICE}/
 # Install dependencies - prioritize setup.py, fallback to requirements.txt
 RUN if [ -f ${SERVICE}/setup.py ]; then \
     echo "Installing dependencies from setup.py..."; \
-    RUN pip install --no-cache-dir "./${SERVICE}" --target "/opt/python"; \
+    pip install --no-cache-dir "./${SERVICE}" --target "/opt/python"; \
     elif [ -f ${SERVICE}/requirements.txt ]; then \
     echo "Installing dependencies from requirements.txt..."; \
     pip install --upgrade --no-cache-dir -r ${SERVICE}/requirements.txt --target "/opt/python"; \ 

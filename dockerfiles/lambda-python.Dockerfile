@@ -12,7 +12,7 @@ WORKDIR ${LAMBDA_TASK_ROOT}
 
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 # Copy all service code to Lambda task root
-COPY . ${LAMBDA_TASK_ROOT}/${SERVICE}/
+COPY ${SERVICE}/ ${LAMBDA_TASK_ROOT}/${SERVICE}/
 
 
 

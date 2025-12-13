@@ -115,4 +115,7 @@ resource "aws_lambda_permission" "allow_public_url" {
   function_name          = var.use_zip ? aws_lambda_function.zip_lambda[0].function_name : aws_lambda_function.container_lambda[0].function_name
   principal              = "*"
   function_url_auth_type = "NONE"
+  depends_on = [
+    aws_lambda_function_url.function_url
+  ]
 }

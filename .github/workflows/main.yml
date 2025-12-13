@@ -123,6 +123,7 @@ jobs:
             -f "$DOCKERFILE_PATH" \
             --build-arg HANDLER=${{ inputs.lambda_handler }} \
             --build-arg EXEC_SCRIPT=${{ inputs.main_file }} \
+            --build-arg SERVICE=${{inputs.lambda_code_path}} \
             -t $ECR_REPO:$IMAGE_TAG \
             -t $ECR_REPO:latest \
             ${{ inputs.lambda_code_path }}

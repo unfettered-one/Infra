@@ -7,28 +7,28 @@ FROM public.ecr.aws/lambda/python:3.11
 # Accept handler as build argument (can be overridden at build time)
 ARG HANDLER=app.lambda_handler
 ARG EXEC_SCRIPT=""
+ARG SERVICE=""
 # Copy all service code to Lambda task root
-COPY . ${LAMBDA_TASK_ROOT}/
-# Silence pip root warning
-ENV PIP_ROOT_USER_ACTION=ignore
+COPY . ${LAMBDA_TASK_ROOT}/${SERVICE}/
+
 # Set working directory
 WORKDIR ${LAMBDA_TASK_ROOT}
 
 # Install dependencies - prioritize setup.py, fallback to requirements.txt
 RUN if [ -f setup.py ]; then \
     echo "Installing dependencies from setup.py..."; \
-    pip install --no-cache-dir . --target "${LAMBDA_TASK_ROOT}"; \
+    pip install --upgrade --no-cache-dir . --target "${LAMBDA_TASK_ROOT}"; \
     elif [ -f requirements.txt ]; then \
     echo "Installing dependencies from requirements.txt..."; \
-    pip install --no-cache-dir -r requirements.txt --target "${LAMBDA_TASK_ROOT}"; \
+    pip install --upgrade --no-cache-dir -r requirements.txt --target "${LAMBDA_TASK_ROOT}"; \
     else \
     echo "No dependency file found (setup.py or requirements.txt). Skipping..."; \
     fi
 
 # Make an optional script executable when provided via build-arg `EXEC_SCRIPT`
-RUN if [ -n "${EXEC_SCRIPT}" ] && [ -f "${LAMBDA_TASK_ROOT}/${EXEC_SCRIPT}" ]; then \
+RUN if [ -n "${EXEC_SCRIPT}" ] && [ -f "${LAMBDA_TASK_ROOT}/${SERVICE}/${EXEC_SCRIPT}" ]; then \
     echo "Making ${EXEC_SCRIPT} executable"; \
-    chmod 755 "${LAMBDA_TASK_ROOT}/${EXEC_SCRIPT}"; \
+    chmod 755 "${LAMBDA_TASK_ROOT}/${SERVICE}/${EXEC_SCRIPT}"; \
     else \
     echo "No EXEC_SCRIPT provided or file not found; skipping chmod."; \
     fi

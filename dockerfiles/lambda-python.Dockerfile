@@ -16,12 +16,12 @@ COPY . ${LAMBDA_TASK_ROOT}/${SERVICE}/
 WORKDIR ${LAMBDA_TASK_ROOT}
 
 # Install dependencies - prioritize setup.py, fallback to requirements.txt
-RUN if [ -f setup.py ]; then \
+RUN if [ -f ${SERVICE}/setup.py ]; then \
     echo "Installing dependencies from setup.py..."; \
     pip install --upgrade --no-cache-dir . --target "${LAMBDA_TASK_ROOT}"; \
-    elif [ -f requirements.txt ]; then \
+    elif [ -f ${SERVICE}/requirements.txt ]; then \
     echo "Installing dependencies from requirements.txt..."; \
-    pip install --upgrade --no-cache-dir -r requirements.txt --target "${LAMBDA_TASK_ROOT}"; \
+    pip install --upgrade --no-cache-dir -r ${SERVICE}/requirements.txt --target "${LAMBDA_TASK_ROOT}"; \
     else \
     echo "No dependency file found (setup.py or requirements.txt). Skipping..."; \
     fi

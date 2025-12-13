@@ -12,18 +12,17 @@ WORKDIR ${LAMBDA_TASK_ROOT}
 
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 # Copy all service code to Lambda task root
-COPY ${SERVICE}/ ${LAMBDA_TASK_ROOT}/${SERVICE}/
+COPY . ${LAMBDA_TASK_ROOT}/${SERVICE}/
 
 
 
 # Install dependencies - prioritize setup.py, fallback to requirements.txt
 RUN if [ -f ${SERVICE}/setup.py ]; then \
     echo "Installing dependencies from setup.py..."; \
-    pip install --upgrade --no-cache-dir "./${SERVICE}" --target "${LAMBDA_TASK_ROOT}"; \
+    RUN pip install --no-cache-dir "./${SERVICE}" --target "/opt/python"; \
     elif [ -f ${SERVICE}/requirements.txt ]; then \
     echo "Installing dependencies from requirements.txt..."; \
-    pip install --upgrade --no-cache-dir -r ${SERVICE}/requirements.txt --target "${LAMBDA_TASK_ROOT}"; \ 
-    awslambdaric; \
+    pip install --upgrade --no-cache-dir -r ${SERVICE}/requirements.txt --target "/opt/python"; \ 
     else \
     echo "No dependency file found (setup.py or requirements.txt). Skipping..."; \
     fi

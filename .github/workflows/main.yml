@@ -125,7 +125,7 @@ jobs:
             --build-arg SERVICE=${{inputs.lambda_code_path}} \
             -t $ECR_REPO:$IMAGE_TAG \
             -t $ECR_REPO:latest \
-            ${{ inputs.lambda_code_path }}
+            .
 
           docker push $ECR_REPO:$IMAGE_TAG
           docker push $ECR_REPO:latest

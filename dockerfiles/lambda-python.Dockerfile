@@ -5,9 +5,11 @@
 FROM public.ecr.aws/lambda/python:3.11
 
 # Accept handler as build argument (can be overridden at build time)
-ARG HANDLER=app.lambda_handler
+ARG HANDLER=""
 ARG EXEC_SCRIPT=""
 ARG SERVICE=""
+
+SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 # Copy all service code to Lambda task root
 COPY . ${LAMBDA_TASK_ROOT}/${SERVICE}/
 
@@ -34,7 +36,7 @@ RUN if [ -n "${EXEC_SCRIPT}" ] && [ -f "${LAMBDA_TASK_ROOT}/${SERVICE}/${EXEC_SC
     fi
 
 # Set the CMD to your handler (can be overridden at runtime)
-CMD [ "${HANDLER}" ]
+# CMD [ "${HANDLER}" ]
 
 # Alternative: If you want handler to be more flexible, use this instead:
 # ENTRYPOINT [ "python", "-m", "awslambdaric" ]

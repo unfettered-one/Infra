@@ -45,7 +45,7 @@ variable "lambda_runtime" {
 }
 
 variable "lambda_handler" {
-  description = "Lambda handler entrypoint (required when use_zip = true)"
+  description = "Lambda handler entrypoint (required when use_zip = true or use_container = true)"
   type        = string
   default     = ""
 }

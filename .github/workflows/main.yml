@@ -55,7 +55,9 @@ on:
         type: string
         description: "ECR repository URL for pushing Lambda images"
         default: "815817733987.dkr.ecr.ap-south-1.amazonaws.com/lambda-images"
-
+      main_file:
+        required: true
+        type: string
 env:
   TF_IN_AUTOMATION: "true"
   TF_INPUT: "false"
@@ -120,6 +122,7 @@ jobs:
           docker build \
             -f "$DOCKERFILE_PATH" \
             --build-arg HANDLER=${{ inputs.lambda_handler }} \
+            --build-arg EXEC_SCRIPT=${{ inputs.main_file }} \
             -t $ECR_REPO:$IMAGE_TAG \
             -t $ECR_REPO:latest \
             ${{ inputs.lambda_code_path }}

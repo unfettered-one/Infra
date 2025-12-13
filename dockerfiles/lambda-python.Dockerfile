@@ -6,7 +6,7 @@ FROM public.ecr.aws/lambda/python:3.11
 
 # Accept handler as build argument (can be overridden at build time)
 ARG HANDLER=app.lambda_handler
-
+ARG EXEC_SCRIPT=""
 # Copy all service code to Lambda task root
 COPY . ${LAMBDA_TASK_ROOT}/
 
@@ -22,6 +22,14 @@ RUN if [ -f setup.py ]; then \
     pip install --no-cache-dir -r requirements.txt --target "${LAMBDA_TASK_ROOT}"; \
     else \
     echo "No dependency file found (setup.py or requirements.txt). Skipping..."; \
+    fi
+
+# Make an optional script executable when provided via build-arg `EXEC_SCRIPT`
+RUN if [ -n "${EXEC_SCRIPT}" ] && [ -f "${LAMBDA_TASK_ROOT}/${EXEC_SCRIPT}" ]; then \
+    echo "Making ${EXEC_SCRIPT} executable"; \
+    chmod 755 "${LAMBDA_TASK_ROOT}/${EXEC_SCRIPT}"; \
+    else \
+    echo "No EXEC_SCRIPT provided or file not found; skipping chmod."; \
     fi
 
 # Set the CMD to your handler (can be overridden at runtime)

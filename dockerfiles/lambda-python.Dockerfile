@@ -5,27 +5,42 @@
 FROM public.ecr.aws/lambda/python:3.11
 
 # Accept handler as build argument (can be overridden at build time)
-ARG HANDLER=app.lambda_handler
-
-# Copy all service code to Lambda task root
-COPY . ${LAMBDA_TASK_ROOT}/
-
+ARG EXEC_SCRIPT=""
+ARG SERVICE=""
 # Set working directory
 WORKDIR ${LAMBDA_TASK_ROOT}
 
+SHELL ["/bin/bash", "-o", "pipefail", "-c"]
+# Copy all service code to Lambda task root
+COPY ${SERVICE}/ ${LAMBDA_TASK_ROOT}/${SERVICE}/
+
+RUN touch \
+    ${LAMBDA_TASK_ROOT}/${SERVICE}/__init__.py 
+
 # Install dependencies - prioritize setup.py, fallback to requirements.txt
-RUN if [ -f setup.py ]; then \
+RUN if [ -f ${SERVICE}/setup.py ]; then \
     echo "Installing dependencies from setup.py..."; \
-    pip install --no-cache-dir . --target "${LAMBDA_TASK_ROOT}"; \
-    elif [ -f requirements.txt ]; then \
+    pip install --no-cache-dir "./${SERVICE}" --target "${LAMBDA_TASK_ROOT}"; \
+    elif [ -f ${SERVICE}/requirements.txt ]; then \
     echo "Installing dependencies from requirements.txt..."; \
-    pip install --no-cache-dir -r requirements.txt --target "${LAMBDA_TASK_ROOT}"; \
+    pip install --upgrade --no-cache-dir -r ${SERVICE}/requirements.txt --target "${LAMBDA_TASK_ROOT}"; \ 
     else \
     echo "No dependency file found (setup.py or requirements.txt). Skipping..."; \
     fi
 
+# Make an optional script executable when provided via build-arg `EXEC_SCRIPT`
+RUN if [ -n "${EXEC_SCRIPT}" ] && [ -f "${LAMBDA_TASK_ROOT}/${SERVICE}/${EXEC_SCRIPT}" ]; then \
+    echo "Making ${EXEC_SCRIPT} executable"; \
+    chmod 755 "${LAMBDA_TASK_ROOT}/${SERVICE}/${EXEC_SCRIPT}"; \
+    else \
+    echo "No EXEC_SCRIPT provided or file not found; skipping chmod."; \
+    fi
+# RUN echo "Contents of ${LAMBDA_TASK_ROOT}/${SERVICE}/:" && ls -la ${LAMBDA_TASK_ROOT}/${SERVICE}/
+# RUN echo "Contents of ${LAMBDA_TASK_ROOT}/:" && ls -la ${LAMBDA_TASK_ROOT}/
+
+# RUN echo "Contents of /opt/python/:" && ls -la /opt/python 
 # Set the CMD to your handler (can be overridden at runtime)
-CMD [ "${HANDLER}" ]
+# CMD [ "${HANDLER}" ]
 
 # Alternative: If you want handler to be more flexible, use this instead:
 # ENTRYPOINT [ "python", "-m", "awslambdaric" ]

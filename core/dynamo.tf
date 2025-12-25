@@ -5,21 +5,37 @@ resource "aws_dynamodb_table" "service_table" {
   name         = var.dynamodb_table_name
   billing_mode = "PAY_PER_REQUEST" # free tier + scalable
 
-  hash_key = "pk"
+  hash_key  = "pk"
+  range_key = var.sort_key ? "sk" : null
 
   attribute {
     name = "pk"
     type = "S"
   }
-  attribute {
-    name = var.new_attribute
-    type = "S"
+
+  dynamic "attribute" {
+    for_each = var.sort_key ? [1] : []
+    content {
+      name = "sk"
+      type = "S"
+    }
   }
 
-  global_secondary_index {
-    name            = var.gsi
-    hash_key        = var.new_attribute
-    projection_type = "ALL"
+  dynamic "attribute" {
+    for_each = var.new_attribute != "" ? [1] : []
+    content {
+      name = var.new_attribute
+      type = "S"
+    }
+  }
+
+  dynamic "global_secondary_index" {
+    for_each = var.gsi != "" && var.new_attribute != "" ? [1] : []
+    content {
+      name            = var.gsi
+      hash_key        = var.new_attribute
+      projection_type = "ALL"
+    }
   }
 
   tags = {

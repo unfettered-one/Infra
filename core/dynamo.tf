@@ -5,12 +5,22 @@ resource "aws_dynamodb_table" "service_table" {
   name         = var.dynamodb_table_name
   billing_mode = "PAY_PER_REQUEST" # free tier + scalable
 
-  hash_key = "pk"
+  hash_key  = "pk"
+  range_key = var.sort_key ? "sk" : null
 
   attribute {
     name = "pk"
     type = "S"
   }
+
+  dynamic "attribute" {
+    for_each = var.sort_key ? [1] : []
+    content {
+      name = "sk"
+      type = "S"
+    }
+  }
+
   attribute {
     name = var.new_attribute
     type = "S"

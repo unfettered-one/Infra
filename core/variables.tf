@@ -105,6 +105,12 @@ variable "new_attribute" {
   default     = ""
 }
 
+variable "sort_key" {
+  description = "Optional sort key name for DynamoDB table"
+  type        = bool
+  default     = false
+}
+
 
 # IAM Role & Policies
 variable "lambda_execution_policy_arn" {

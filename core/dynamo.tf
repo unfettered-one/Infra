@@ -21,15 +21,21 @@ resource "aws_dynamodb_table" "service_table" {
     }
   }
 
-  attribute {
-    name = var.new_attribute
-    type = "S"
+  dynamic "attribute" {
+    for_each = var.new_attribute != "" ? [1] : []
+    content {
+      name = var.new_attribute
+      type = "S"
+    }
   }
 
-  global_secondary_index {
-    name            = var.gsi
-    hash_key        = var.new_attribute
-    projection_type = "ALL"
+  dynamic "global_secondary_index" {
+    for_each = var.gsi != "" && var.new_attribute != "" ? [1] : []
+    content {
+      name            = var.gsi
+      hash_key        = var.new_attribute
+      projection_type = "ALL"
+    }
   }
 
   tags = {

@@ -4,3 +4,5 @@ global/.terraform/providers/registry.terraform.io/hashicorp/aws/6.22.1/windows_a
 global/terraform.tfstate
 global/terraform.tfstate.backup
 global/terraform.tfstate.1764420394.backup
+core/.terraform
+core/.terraform.lock.hcl

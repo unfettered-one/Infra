@@ -1,12 +1,12 @@
 
 resource "aws_dynamodb_table" "service_table" {
-  count = var.enable_dynamodb ? 1 : 0
+  for_each = var.dynamodb_tables
 
-  name         = var.dynamodb_table_name
+  name         = each.key
   billing_mode = "PAY_PER_REQUEST" # free tier + scalable
 
   hash_key  = "pk"
-  range_key = var.sort_key ? "sk" : null
+  range_key = each.value.sort_key ? "sk" : null
 
   attribute {
     name = "pk"
@@ -14,7 +14,7 @@ resource "aws_dynamodb_table" "service_table" {
   }
 
   dynamic "attribute" {
-    for_each = var.sort_key ? [1] : []
+    for_each = each.value.sort_key ? [1] : []
     content {
       name = "sk"
       type = "S"
@@ -22,18 +22,18 @@ resource "aws_dynamodb_table" "service_table" {
   }
 
   dynamic "attribute" {
-    for_each = var.new_attribute != "" ? [1] : []
+    for_each = each.value.new_attribute != "" ? [1] : []
     content {
-      name = var.new_attribute
+      name = each.value.new_attribute
       type = "S"
     }
   }
 
   dynamic "global_secondary_index" {
-    for_each = var.gsi != "" && var.new_attribute != "" ? [1] : []
+    for_each = each.value.gsi != "" && each.value.new_attribute != "" ? [1] : []
     content {
-      name            = var.gsi
-      hash_key        = var.new_attribute
+      name            = each.value.gsi
+      hash_key        = each.value.new_attribute
       projection_type = "ALL"
     }
   }
@@ -46,10 +46,12 @@ resource "aws_dynamodb_table" "service_table" {
 }
 
 
-output "dynamodb_table_name" {
-  value = var.enable_dynamodb ? aws_dynamodb_table.service_table[0].name : null
+output "dynamodb_table_names" {
+  description = "Map of DynamoDB table names (key = table key, value = table name)"
+  value       = { for k, v in aws_dynamodb_table.service_table : k => v.name }
 }
 
-output "dynamodb_table_arn" {
-  value = var.enable_dynamodb ? aws_dynamodb_table.service_table[0].arn : null
+output "dynamodb_table_arns" {
+  description = "Map of DynamoDB table ARNs (key = table key, value = table ARN)"
+  value       = { for k, v in aws_dynamodb_table.service_table : k => v.arn }
 }

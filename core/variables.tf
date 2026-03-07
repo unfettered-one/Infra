@@ -80,35 +80,15 @@ variable "environment_variables" {
 
 
 
-# Optional DynamoDB Table
-variable "enable_dynamodb" {
-  description = "Enable creation of a DynamoDB table"
-  type        = bool
-  default     = false
-}
-
-variable "dynamodb_table_name" {
-  description = "Name of DynamoDB table (required if enabled)"
-  type        = string
-  default     = ""
-}
-
-variable "gsi" {
-  description = "name of global secodary index"
-  type        = string
-  default     = ""
-}
-
-variable "new_attribute" {
-  description = "New attribute for DynamoDB table"
-  type        = string
-  default     = ""
-}
-
-variable "sort_key" {
-  description = "Optional sort key name for DynamoDB table"
-  type        = bool
-  default     = false
+# Optional DynamoDB Tables (map of objects, key = table name)
+variable "dynamodb_tables" {
+  description = "Map of DynamoDB tables to create. Key = table name. If empty, no tables are created."
+  type = map(object({
+    sort_key      = optional(bool, false)
+    gsi           = optional(string, "")
+    new_attribute = optional(string, "")
+  }))
+  default = {}
 }
 
 

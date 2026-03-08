@@ -110,27 +110,52 @@ jobs:
       - name: Build & Push Docker Image to ECR
         id: push
         env:
-          IMAGE_TAG: ${{ github.sha }}
           ECR_REPO: ${{ inputs.ecr_repository_url }}
         run: |
+          set -euo pipefail
+
           if [ "${{ inputs.use_local_dockerfile }}" == "true" ]; then
             DOCKERFILE_PATH="${{ inputs.dockerfile_path }}"
           else
             DOCKERFILE_PATH="_infra/dockerfiles/${{ inputs.dockerfile_path }}"
           fi
 
+          REPO_NAME="${GITHUB_REPOSITORY##*/}"
+          SANITIZED_REPO_NAME="$(printf '%s' "$REPO_NAME" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9._-]/-/g')"
+          REPO_LATEST_TAG="${SANITIZED_REPO_NAME}-latest"
+          ECR_REPOSITORY_NAME="${ECR_REPO#*/}"
+
           docker build \
             -f "$DOCKERFILE_PATH" \
-            --build-arg EXEC_SCRIPT=${{ inputs.main_file }} \
-            --build-arg SERVICE=${{inputs.lambda_code_path}} \
-            -t $ECR_REPO:$IMAGE_TAG \
-            -t $ECR_REPO:latest \
+            --build-arg "EXEC_SCRIPT=${{ inputs.main_file }}" \
+            --build-arg "SERVICE=${{ inputs.lambda_code_path }}" \
+            -t "$ECR_REPO:$REPO_LATEST_TAG" \
             .
 
-          docker push $ECR_REPO:$IMAGE_TAG
-          docker push $ECR_REPO:latest
+          docker push "$ECR_REPO:$REPO_LATEST_TAG"
 
-          echo "image_uri=$ECR_REPO:$IMAGE_TAG" >> $GITHUB_OUTPUT
+          IMAGE_DIGEST=""
+          for attempt in 1 2 3; do
+            IMAGE_DIGEST="$(aws ecr describe-images \
+              --region "${{ inputs.aws_region }}" \
+              --repository-name "$ECR_REPOSITORY_NAME" \
+              --image-ids imageTag="$REPO_LATEST_TAG" \
+              --query 'imageDetails[0].imageDigest' \
+              --output text 2>/dev/null || true)"
+
+            if [ -n "$IMAGE_DIGEST" ] && [ "$IMAGE_DIGEST" != "None" ]; then
+              break
+            fi
+
+            sleep 5
+          done
+
+          if [ -z "$IMAGE_DIGEST" ] || [ "$IMAGE_DIGEST" = "None" ]; then
+            echo "Failed to resolve image digest for $ECR_REPO:$REPO_LATEST_TAG" >&2
+            exit 1
+          fi
+
+          echo "image_uri=$ECR_REPO@$IMAGE_DIGEST" >> "$GITHUB_OUTPUT"
 
   ########################################################
   # JOB 2 — TERRAFORM PLAN
